@@ -55,7 +55,7 @@ repos:
         name: zizmor
         entry: mise exec -- zizmor --offline --no-progress
         language: unsupported
-        files: ^(\.github/workflows/[^/]+\.ya?ml|\.pre-commit-config\.yaml)$
+        files: ^(\.github/workflows/[^/]+\.ya?ml|\.github/dependabot\.ya?ml|\.pre-commit-config\.yaml)$
         require_serial: true
 
       # Lint before format, as Ruff recommends.

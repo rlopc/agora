@@ -111,7 +111,8 @@ def build(
         raise
     host = settings.get("host", "127.0.0.1")
     port = int(settings.get("port", 8765))
-    app = create_app(room, channel, hosts=sorted({host, "127.0.0.1", "localhost"}))
+    hosts = sorted({host, "127.0.0.1", "localhost"})
+    app = create_app(room, channel, hosts=hosts, origins=[f"http://{h}:{port}" for h in hosts])
 
     def close() -> None:
         threads.shutdown(wait=True, cancel_futures=False)

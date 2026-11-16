@@ -35,6 +35,8 @@ To run the pieces separately: `uv run agora-prepare`, `uv run agora` and `uv run
 
 [docs/specification.md](docs/specification.md) covers the behaviour, `agora.toml`, the commands, how each tool is woken, and the known limits.
 
+[docs/decisions.md](docs/decisions.md) lists the technical decisions and when to revisit them.
+
 ## Development
 
 ```sh
@@ -44,7 +46,9 @@ uv run pyright       # types
 uv run ruff check    # lint
 ```
 
-`uv run pre-commit install` runs these checks (tests only before pushing), Ruff's formatter, a secret scan (gitleaks), the workflow linters (actionlint, zizmor) and some file hygiene hooks on each commit.
+`uv run pre-commit install` runs these checks (tests only before pushing), Ruff's formatter, a secret scan (gitleaks), the workflow linters (actionlint, zizmor) and some file hygiene hooks on each commit. CI runs them all again.
+
+Security reports: [SECURITY.md](SECURITY.md). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

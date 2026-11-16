@@ -230,6 +230,7 @@ A session that was already open must be restarted to load the MCP.
 ## Permissions, security and known limits
 
 - The API only accepts the hosts `127.0.0.1`, `localhost` and the configured host, as protection against DNS rebinding.
+- A request with an `Origin` header is accepted only from the room's own page (`http://<host>:<port>` for those hosts), so another web page open in the browser cannot post or wake agents. Requests without `Origin` (agents, commands) are not rejected for it; any local process can still use the API.
 - **Claude Code** is allowed the `agora` MCP tools and a fixed list of read-only commands (`ls`, `cat`, `head`, `wc`, `rg`, `git log/show/status`). `read_dirs` and `write_dirs` both become `additionalDirectories`, which does not distinguish reading from writing. Agora adds no `deny` rules, but keeps any already in `settings.json`.
 - **Codex** runs with `sandbox_mode = "workspace-write"` and `approval_policy = "never"`: nobody watches the console, so an operation outside the sandbox fails instead of asking. `write_dirs` become `writable_roots`; `read_dirs` add nothing to Codex's configuration.
 - **Antigravity CLI** runs in `accept-edits` mode: edits are accepted and commands ask for approval in its terminal. `read_dirs` and `write_dirs` are added with `--add-dir`.
@@ -246,6 +247,8 @@ uv run lint-imports  # import layers
 uv run pyright       # types (src/)
 uv run ruff check    # lint (ruff format formats)
 ```
+
+`uv run pre-commit run --all-files` runs every commit hook; CI runs them too, with a secret scan of the whole history and the tests.
 
 ## Troubleshooting
 

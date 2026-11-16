@@ -46,6 +46,17 @@ def test_non_local_host_rejected(setup):
     assert client.get("/api/state", headers={"host": "evil.example"}).status_code == 400
 
 
+def test_request_from_another_origin_rejected(setup):
+    client, room, codex = setup
+    evil = {"origin": "http://127.0.0.1:3000"}
+    assert client.post("/api/wake/codex", headers=evil).status_code == 403
+    assert client.post("/api/messages", json={"text": "@codex hi"}, headers=evil).status_code == 403
+    assert codex.calls == [] and room.messages(0, 10) == []
+    # The room's own page, and requests without Origin (agents, commands), still work.
+    assert client.post("/api/messages", json={"text": "hi"}, headers={"origin": "http://testserver"}).status_code == 200
+    assert client.get("/api/state").status_code == 200
+
+
 def test_participants(setup):
     client, _, _ = setup
     data = client.get("/api/participants").json()
