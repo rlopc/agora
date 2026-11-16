@@ -10,4 +10,4 @@ uv run agora-start --config ~/debates/design-debate/agora.toml
 tmux attach -t agora
 ```
 
-Then write the question in the room (<http://127.0.0.1:8765>); without a mention it goes to the moderator.
+Answer the first-run questions in each agent's window (see the main README's quick start), then write the question in the room (<http://127.0.0.1:8765>); without a mention it goes to the moderator.

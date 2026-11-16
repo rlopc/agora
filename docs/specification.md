@@ -186,6 +186,8 @@ What `agora-prepare` generates for each tool:
 | Codex | `CODEX_HOME/config.toml`, `CODEX_HOME/agents/subagent.toml` and `<folder>/.codex/hooks.json` | Hooks on `SessionStart` and `UserPromptSubmit`. The agent's note goes in `developer_instructions`. Codex asks to trust the hooks again whenever `hooks.json` changes. |
 | Antigravity CLI | `<folder>/.agents/mcp_config.json`, `<folder>/.agents/hooks.json` and `<folder>/.agents/rules/agora.md` | Hooks on `SessionStart` and `PreInvocation`. The rule is always applied (`trigger: always_on`). `agy` asks to trust the folder the first time. |
 
+On first launch each tool asks in its window before the session exists: Claude Code to trust the folder and to use the `agora` MCP server (in both, the default option is the one that declines), Codex to trust the hooks, Antigravity to trust the folder. Until they are answered, the room cannot wake that agent.
+
 `agora-launch` opens each tool like this:
 
 - Claude Code: `claude --model M --permission-mode acceptEdits`, without the `CLAUDE*` variables of the session that runs the command.
@@ -252,7 +254,7 @@ uv run pyright       # types (src/)
 | `room not available` in the MCP or a hook | Start the room (`uv run agora`, or `agora-start`). |
 | The port is already in use | Another room is running at that address: stop it or choose another port. |
 | An agent does not wake | Check the pause, `max_hops`, batching and the error in the UI; see [Wakers](#wakers) for what each tool needs. |
-| Claude Code does not wake | Open an interactive session in the agent's exact folder; do not open a second Claude Code session there. |
+| Claude Code does not wake | Answer the first-run dialogs in its window (trust the folder, use the `agora` MCP), or open an interactive session in the agent's exact folder; do not open a second Claude Code session there. Then wake it again from the UI. |
 | Codex does not wake | Check its `CODEX_HOME` and folder, and that a main session exists (`agora-launch` creates one). |
 | Antigravity does not react | Expected until it calls the model: write to it in its window. |
 | The room ignores a configuration change | Run `agora-prepare` and restart the room: it reads `agora.toml` when it starts. |
