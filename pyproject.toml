@@ -1,0 +1,70 @@
+[project]
+name = "agora"
+version = "0.1.0"
+description = "Local room where a user coordinates AI coding agents"
+license = "MIT"
+requires-python = ">=3.14"
+dependencies = [
+    "fastapi>=0.162",
+    "httpx>=0.28",
+    "mcp>=2.3",
+    "tomlkit>=0.15.2",
+    "uvicorn>=0.54",
+]
+
+[project.scripts]
+agora = "agora.server:main"
+agora-mcp = "agora.mcp.server:main"
+agora-prepare = "agora.cli:main_prepare"
+agora-launch = "agora.cli:main_launch"
+agora-start = "agora.cli:main_start"
+agora-watch = "agora.agents.watch:main_watch"
+agora-pending = "agora.agents.watch:main_pending"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2",
+    "httpx>=0.28",
+    "import-linter>=2.16",
+    "pyright[nodejs]>=1.1.414",
+]
+
+[build-system]
+requires = ["uv_build>=0.10.4,<0.11"]
+build-backend = "uv_build"
+
+[tool.uv]
+# Skip versions published less than 7 days ago (supply-chain protection), as mise.toml does.
+exclude-newer = "7 days"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "--import-mode=importlib"
+
+[tool.importlinter]
+root_package = "agora"
+
+[[tool.importlinter.contracts]]
+name = "Composition depends on tools, tools on agents, agents on core"
+type = "layers"
+layers = [
+    "agora.cli | agora.server",
+    "agora.tools",
+    "agora.agents",
+    "agora.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "Tools are independent of each other"
+type = "independence"
+modules = ["agora.tools.antigravity", "agora.tools.claude", "agora.tools.codex"]
+
+[[tool.importlinter.contracts]]
+name = "Store, web and MCP depend only on core"
+type = "forbidden"
+source_modules = ["agora.store", "agora.web", "agora.mcp"]
+forbidden_modules = ["agora.agents", "agora.tools", "agora.server", "agora.cli"]
+
+[tool.pyright]
+# Tests are not checked: they narrow types by hand and use test doubles.
+include = ["src"]

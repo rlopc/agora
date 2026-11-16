@@ -1,0 +1,46 @@
+# Runs the project's checks (tests, import layers, types) on each pull request and on main.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    name: check (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # The supported platforms: macOS and Linux.
+        os: [ubuntu-24.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: jdx/mise-action@f5be966e4a917d54244728e6a5fdcd1d93a35e6c # v5.2.6
+        with:
+          # mise.lock is format 4, which needs it (min_version in mise.toml).
+          version: 2026.11.5
+          install: false
+
+      - run: mise install --locked
+        env:
+          # Read-only; avoids GitHub API rate limits on shared runners.
+          GITHUB_TOKEN: ${{ github.token }}
+
+      - run: mise exec -- uv sync --locked
+      - run: mise exec -- uv run pytest
+      - run: mise exec -- uv run lint-imports
+      - run: mise exec -- uv run pyright

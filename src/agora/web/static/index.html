@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent room</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <header class="header">
+    <div class="title">
+      <h1>Agent room</h1>
+      <span id="status" class="status" role="status">Connecting…</span>
+    </div>
+    <div class="controls">
+      <ul id="participants" class="participants" aria-label="Participants"></ul>
+      <button id="pause" type="button" class="button" aria-pressed="false">Pause wakes</button>
+    </div>
+  </header>
+
+  <main id="messages" class="messages" aria-live="polite">
+    <p id="empty" class="empty">No messages yet. Mention <b>@claude</b> or <b>@codex</b> to wake them.</p>
+  </main>
+
+  <form id="form" class="composer">
+    <button id="new-messages" type="button" class="new-messages" hidden></button>
+    <div id="reply" class="reply" hidden>
+      <span id="reply-text"></span>
+      <button id="reply-cancel" type="button" class="link" aria-label="Cancel reply">×</button>
+    </div>
+    <div class="row">
+      <textarea id="text" rows="2" placeholder="Write a message… (Enter sends, Shift+Enter new line)" aria-label="Message"></textarea>
+      <button type="submit" class="button primary">Send</button>
+    </div>
+  </form>
+
+  <div id="toasts" class="toasts" aria-live="assertive"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "cSpell.words": [
+    "addopts",
+    "claude",
+    "fastapi",
+    "httpx",
+    "importlinter",
+    "pyproject",
+    "pytest",
+    "testpaths",
+    "tomlkit",
+    "Uvicorn"
+  ]
+}

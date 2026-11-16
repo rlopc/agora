@@ -1,0 +1,23 @@
+# Agent room configuration (uv run agora)
+
+[room]
+host = "127.0.0.1"
+port = 8765
+db = "data/agora.db"   # derived, excluded from Git
+max_hops = 3           # consecutive messages between agents before waiting for the user
+
+# Defaults for each tool; a participant can override them.
+[tools.claude]
+model = "opus"
+
+[[participants]]
+id = "user"
+name = "User"
+type = "human"
+
+[[participants]]
+id = "claude"
+name = "Claude"
+type = "agent"
+tool = "claude"   # waker: concierge (`claude -p` with Haiku)
+folder = "."

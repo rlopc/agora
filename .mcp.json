@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "agora": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--quiet",
+        "--frozen",
+        "--project",
+        "${CLAUDE_PROJECT_DIR:-.}",
+        "agora-mcp"
+      ],
+      "env": {
+        "AGORA_PARTICIPANT": "claude",
+        "AGORA_URL": "http://127.0.0.1:8765"
+      }
+    }
+  }
+}

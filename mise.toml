@@ -1,0 +1,13 @@
+# Tool versions for development and CI. Python is not here: uv installs it
+# (.python-version and uv.lock at the root). tmux comes from the system package manager.
+# mise.lock uses lockfile format 4; older mise fails to read it.
+min_version = "2026.11.5"
+
+[tools]
+uv = "0.13.7"
+
+[settings]
+# Skip versions published less than 7 days ago, for `mise upgrade`.
+minimum_release_age = "7d"
+lockfile = true
+lockfile_platforms = ["macos-arm64", "linux-x64", "linux-arm64"]

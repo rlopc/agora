@@ -1,0 +1,38 @@
+# Design debate: a moderator and two Claude Code agents argue a design question.
+# Copy this folder outside the agora repository before using it (see README.md).
+
+[room]
+port = 8765
+db = "data/agora.db"
+max_hops = 3
+# project = "/path/to/agora"   # needed only if this folder is not run with agora's uv project
+
+[tools.claude]
+model = "sonnet"
+
+[[participants]]
+id = "user"
+name = "User"
+type = "human"
+
+[[participants]]
+id = "moderator"
+name = "Moderator"
+type = "agent"
+role = "moderator"
+tool = "claude"
+folder = "moderator"
+
+[[participants]]
+id = "proponent"
+name = "Proponent"
+type = "agent"
+tool = "claude"
+folder = "proponent"
+
+[[participants]]
+id = "critic"
+name = "Critic"
+type = "agent"
+tool = "claude"
+folder = "critic"
