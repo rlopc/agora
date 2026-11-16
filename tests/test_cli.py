@@ -25,12 +25,12 @@ def agent(id):
 
 
 def test_launch_codex():
-    l = TOOLS["codex"].launch(agent("aegis"), {"PATH": "x"})
+    launch = TOOLS["codex"].launch(agent("aegis"), {"PATH": "x"})
     # With a first message, Codex creates its session on start and the room finds it to wake it.
-    assert l.argv == ["codex", "--model", "gpt-5.6-terra", FIRST_MESSAGE]
+    assert launch.argv == ["codex", "--model", "gpt-5.6-terra", FIRST_MESSAGE]
     assert "pending" in FIRST_MESSAGE
-    assert l.cwd == BASE / "aegis"
-    assert l.env == {"PATH": "x", "CODEX_HOME": r"/homes/aegis"}
+    assert launch.cwd == BASE / "aegis"
+    assert launch.env == {"PATH": "x", "CODEX_HOME": r"/homes/aegis"}
 
 
 def test_launch_without_model_uses_the_tool_default():
@@ -40,9 +40,9 @@ def test_launch_without_model_uses_the_tool_default():
 
 
 def test_launch_claude_without_claude_variables():
-    l = TOOLS["claude"].launch(agent("moderator"), {"PATH": "x", "CLAUDECODE": "1", "claude_code_sse_port": "9"})
-    assert l.argv == ["claude", "--model", "opus", "--permission-mode", "acceptEdits"]
-    assert l.cwd == BASE and l.env == {"PATH": "x"}
+    launch = TOOLS["claude"].launch(agent("moderator"), {"PATH": "x", "CLAUDECODE": "1", "claude_code_sse_port": "9"})
+    assert launch.argv == ["claude", "--model", "opus", "--permission-mode", "acceptEdits"]
+    assert launch.cwd == BASE and launch.env == {"PATH": "x"}
 
 
 def test_start_opens_room_and_agents_in_order(monkeypatch, tmp_path):
@@ -50,7 +50,7 @@ def test_start_opens_room_and_agents_in_order(monkeypatch, tmp_path):
         (tmp_path / folder).mkdir()
     path = tmp_path / "agora.toml"
     path.write_text(
-        '[room]\nport = 8766\n\n[tools.codex]\nhomes = \'' + str(tmp_path / "homes") + "'\n\n"
+        "[room]\nport = 8766\n\n[tools.codex]\nhomes = '" + str(tmp_path / "homes") + "'\n\n"
         '[[participants]]\nid = "user"\nname = "U"\ntype = "human"\n\n'
         '[[participants]]\nid = "moderator"\nname = "M"\ntype = "agent"\nfolder = "."\ntool = "claude"\n\n'
         '[[participants]]\nid = "aegis"\nname = "A"\ntype = "agent"\nfolder = "aegis"\ntool = "codex"\n\n'

@@ -9,7 +9,7 @@ from typing import Any
 
 from agora.agents.config import ResolvedAgent
 from agora.agents.environment import Environment
-from agora.agents.tool import Launch, model_flag, UnconfiguredWaker, WakeContext
+from agora.agents.tool import Launch, UnconfiguredWaker, WakeContext, model_flag
 from agora.core import Waker
 from agora.tools.codex.config import CodexOptions, generate_codex, own_note, resolve_options
 from agora.tools.codex.waker import CodexQueueWaker
@@ -22,7 +22,7 @@ def _thread_in_config(path: Path, participant: str) -> str:
     try:
         with path.open("rb") as f:
             config = tomllib.load(f)
-    except (OSError, tomllib.TOMLDecodeError):
+    except OSError, tomllib.TOMLDecodeError:
         return ""
     for data in config.get("participants", []):
         if str(data.get("id", "")).lower() == participant:
@@ -46,7 +46,9 @@ class Codex:
         return own_note(p, environment)
 
     def launch(self, p: ResolvedAgent, base_env: Mapping[str, str]) -> Launch:
-        return Launch(["codex", *model_flag(p), FIRST_MESSAGE], p.folder, {**base_env, "CODEX_HOME": str(p.tool_options.home)})
+        return Launch(
+            ["codex", *model_flag(p), FIRST_MESSAGE], p.folder, {**base_env, "CODEX_HOME": str(p.tool_options.home)}
+        )
 
     def create_waker(self, p: ResolvedAgent, context: WakeContext) -> Waker:
         variable = f"AGORA_{p.id.upper()}_THREAD"
@@ -56,7 +58,12 @@ class Codex:
             return UnconfiguredWaker(f"missing `codex_thread` or `homes` in agora.toml, or the {variable} variable")
         if not context.env.get(variable) and context.config_path is not None:
             # Re-read on every wake: switching Codex sessions does not require restarting the room.
-            thread = lambda path=context.config_path: _thread_in_config(path, p.id)
+            config_path = context.config_path
+
+            def read_thread() -> str:
+                return _thread_in_config(config_path, p.id)
+
+            thread = read_thread
         return CodexQueueWaker(
             thread,
             executable=p.options.get("executable"),

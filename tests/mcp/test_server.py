@@ -5,11 +5,10 @@ import pytest
 from fastapi.testclient import TestClient
 from mcp.server.mcpserver.exceptions import ToolError
 
-from agora.web import WebChannel, create_app
 from agora.core import Participant, Room
-from agora.store.sqlite import SqliteStore
-
 from agora.mcp import create_server
+from agora.store.sqlite import SqliteStore
+from agora.web import WebChannel, create_app
 
 PARTICIPANTS = [
     Participant("user", "User", "human"),

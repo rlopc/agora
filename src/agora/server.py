@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import logging
 import os
 import socket
@@ -110,7 +111,8 @@ def build(
         raise
     host = settings.get("host", "127.0.0.1")
     port = int(settings.get("port", 8765))
-    app = create_app(room, channel, hosts=sorted({host, "127.0.0.1", "localhost"}))
+    hosts = sorted({host, "127.0.0.1", "localhost"})
+    app = create_app(room, channel, hosts=hosts, origins=[f"http://{h}:{port}" for h in hosts])
 
     def close() -> None:
         threads.shutdown(wait=True, cancel_futures=False)
@@ -164,9 +166,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         config = uvicorn.Config(
             server.app, host=server.host, port=server.port, log_level="warning", timeout_graceful_shutdown=2
         )
-        try:
+        # uvicorn re-raises the signal after stopping; as with `uvicorn.run`, it is not an error.
+        with contextlib.suppress(KeyboardInterrupt):
             UvicornServer(config, server.on_stop).run()
-        except KeyboardInterrupt:
-            pass  # uvicorn re-raises the signal after stopping; as with `uvicorn.run`, it is not an error
     finally:
         server.close()

@@ -15,7 +15,9 @@ EVENTS = ("SessionStart", "PreInvocation")
 
 
 def own_note(p: ResolvedAgent, environment: Environment) -> list[str]:
-    return ["- The room cannot wake you: its pending messages reach you before each model call; handle them with `pending()`."]
+    return [
+        "- The room cannot wake you: its pending messages reach you before each model call; handle them with `pending()`."
+    ]
 
 
 def generate_antigravity(p: ResolvedAgent, environment: Environment, write: bool = True) -> list[Path]:
@@ -31,7 +33,9 @@ def generate_antigravity(p: ResolvedAgent, environment: Environment, write: bool
         data[HOOK] = {event: [own] for event in EVENTS}
 
     # Files in `rules/` without a valid trigger are silently ignored.
-    text = f"---\ntrigger: always_on\ndescription: Agora room\n---\n\n{note(p, environment, own_note(p, environment))}\n"
+    text = (
+        f"---\ntrigger: always_on\ndescription: Agora room\n---\n\n{note(p, environment, own_note(p, environment))}\n"
+    )
 
     changed = []
     if update_json(mcp, change_mcp, write):

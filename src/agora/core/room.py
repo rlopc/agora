@@ -11,7 +11,7 @@ from typing import Any
 
 from agora.core.mentions import extract_mentions
 from agora.core.model import ROLES, Event, Message, Participant
-from agora.core.ports import Channel, Store, Waker, WakeError
+from agora.core.ports import Channel, Store, WakeError, Waker
 
 MAX_HOPS = 3
 

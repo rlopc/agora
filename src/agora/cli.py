@@ -72,12 +72,12 @@ def main_launch(argv: Sequence[str] | None = None) -> None:
     if pending_changes(p, environment, TOOLS):
         changed = tool.generate(p, environment)
         print(f"Configuration of {p.id} updated ({len(changed)} files).")
-    l = tool.launch(p, os.environ)
-    executable = shutil.which(l.argv[0])
+    launch = tool.launch(p, os.environ)
+    executable = shutil.which(launch.argv[0])
     if executable is None:
-        raise SystemExit(f'Cannot find the command "{l.argv[0]}". Install it and try again.')
+        raise SystemExit(f'Cannot find the command "{launch.argv[0]}". Install it and try again.')
     print(f"Starting {p.tool} ({p.id}) with {p.model} in {p.folder}")
-    raise SystemExit(subprocess.run([executable, *l.argv[1:]], cwd=l.cwd, env=l.env).returncode)
+    raise SystemExit(subprocess.run([executable, *launch.argv[1:]], cwd=launch.cwd, env=launch.env).returncode)
 
 
 def main_start(argv: Sequence[str] | None = None) -> None:
@@ -98,7 +98,9 @@ def main_start(argv: Sequence[str] | None = None) -> None:
     uv = ["uv", "run", "--project", str(environment.project)]
     open_window("agora", [*uv, "agora", "--config", str(path)], base)
     if not wait_for_room(environment.url):
-        raise SystemExit(f"The room is not answering at {environment.url}: check its window (tmux attach -t agora) before opening the agents.")
+        raise SystemExit(
+            f"The room is not answering at {environment.url}: check its window (tmux attach -t agora) before opening the agents."
+        )
     for p in found:
         open_window(p.id, [*uv, "agora-launch", "--config", str(path), p.id], p.folder)
     print(f"Room at {environment.url}; agents: {', '.join(p.id for p in found)}. Open them with: tmux attach -t agora")

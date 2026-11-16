@@ -102,7 +102,7 @@ class SqliteStore:
                     (author, text, json.dumps(list(mentions)), reply_to, hops, created.isoformat()),
                 )
                 id = cursor.lastrowid
-                assert id is not None  # always set after an INSERT
+                assert id is not None  # noqa: S101 - narrows the type; always set after an INSERT
                 self._db.executemany(
                     "INSERT INTO mentions (message_id, participant) VALUES (?, ?)",
                     [(id, m) for m in mentions],

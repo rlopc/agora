@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Collection
 from importlib.resources import files
 from typing import Literal
 
@@ -10,9 +11,9 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import HTMLResponse, PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from agora.core import Message, Room, RoomError, format_line
-
 from agora.web.channel import WebChannel
 
 _STATIC = files("agora.web") / "static"
@@ -44,8 +45,32 @@ def _output(messages: list[Message], format: Format):
     return [m.as_dict() for m in messages]
 
 
-def create_app(room: Room, channel: WebChannel, hosts: list[str] | None = None) -> FastAPI:
+class OriginGuard:
+    """Rejects with 403 a request whose Origin is not the room's own.
+
+    Browsers send Origin on cross-site requests, so another web page cannot make the room act
+    (a POST without a body, such as a wake, needs no preflight). A request without Origin, such as
+    the agents' and the commands', is not rejected for it.
+    """
+
+    def __init__(self, app: ASGIApp, origins: Collection[str]) -> None:
+        self._app = app
+        self._origins = origins
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] == "http":
+            origin = dict(scope["headers"]).get(b"origin")
+            if origin is not None and origin.decode("latin-1") not in self._origins:
+                await PlainTextResponse("Origin not allowed", status_code=403)(scope, receive, send)
+                return
+        await self._app(scope, receive, send)
+
+
+def create_app(
+    room: Room, channel: WebChannel, hosts: list[str] | None = None, origins: list[str] | None = None
+) -> FastAPI:
     app = FastAPI(title="Agent room", docs_url=None, redoc_url=None)
+    app.add_middleware(OriginGuard, origins=origins or ["http://testserver"])
     # Prevents DNS rebinding attacks: only local names are served.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts or ["127.0.0.1", "localhost", "testserver"])
 

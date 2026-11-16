@@ -4,8 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from agora.agents import resolve
-from agora.agents import watch
+from agora.agents import resolve, watch
 from agora.agents.environment import Environment
 from agora.core import Message
 from agora.server import create_waker
@@ -20,7 +19,14 @@ def gemini(tmp_path):
     config = {
         "tools": {"antigravity": {"model": "gemini-3.8-flash", "effort": "high"}},
         "participants": [
-            {"id": "gemini", "name": "G", "type": "agent", "folder": "gemini", "tool": "antigravity", "read_dirs": ["/Docs"]}
+            {
+                "id": "gemini",
+                "name": "G",
+                "type": "agent",
+                "folder": "gemini",
+                "tool": "antigravity",
+                "read_dirs": ["/Docs"],
+            }
         ],
     }
     (tmp_path / "gemini").mkdir()
@@ -37,7 +43,10 @@ def test_generates_mcp_hooks_and_rule(gemini):
     agents = p.folder / ".agents"
     changed = generate_antigravity(p, environment)
     assert set(changed) == {agents / "mcp_config.json", agents / "hooks.json", agents / "rules" / "agora.md"}
-    assert read(agents / "mcp_config.json")["mcpServers"]["agora"]["env"] == {"AGORA_PARTICIPANT": "gemini", "AGORA_URL": "http://127.0.0.1:8766"}
+    assert read(agents / "mcp_config.json")["mcpServers"]["agora"]["env"] == {
+        "AGORA_PARTICIPANT": "gemini",
+        "AGORA_URL": "http://127.0.0.1:8766",
+    }
     own = [{"type": "command", "command": COMMAND, "timeout": 10}]
     assert read(agents / "hooks.json") == {"agora": {"SessionStart": own, "PreInvocation": own}}
     rule = (agents / "rules" / "agora.md").read_text(encoding="utf-8")
@@ -59,11 +68,11 @@ def test_keeps_what_others_configured(gemini):
 
 def test_launch_allows_the_room_tools_only_for_the_session(gemini):
     p, _ = gemini
-    l = TOOLS["antigravity"].launch(p, {"PATH": "x"})
-    assert l.argv[:4] == ["agy", "--model", "gemini-3.8-flash", "--mode"]
-    assert json.loads(l.argv[l.argv.index("--settings") + 1]) == {"permissions": {"allow": ["mcp(agora/*)"]}}
-    assert l.argv[-4:] == ["--effort", "high", "--add-dir", "/Docs"]
-    assert l.cwd == p.folder and l.env == {"PATH": "x"}
+    launch = TOOLS["antigravity"].launch(p, {"PATH": "x"})
+    assert launch.argv[:4] == ["agy", "--model", "gemini-3.8-flash", "--mode"]
+    assert json.loads(launch.argv[launch.argv.index("--settings") + 1]) == {"permissions": {"allow": ["mcp(agora/*)"]}}
+    assert launch.argv[-4:] == ["--effort", "high", "--add-dir", "/Docs"]
+    assert launch.cwd == p.folder and launch.env == {"PATH": "x"}
 
 
 def test_the_room_does_not_wake_it_and_says_so_once(gemini):

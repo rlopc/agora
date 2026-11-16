@@ -15,9 +15,8 @@ import uvicorn
 from mcp.client.session import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 
-from agora.server import build
 from agora.agents.tool import UnconfiguredWaker
-from agora.server import load_config
+from agora.server import build, load_config
 
 SCRIPTS = Path(sys.executable).parent
 
@@ -129,7 +128,9 @@ def test_pending_for_hooks(server):
         "#1 user→claude: @claude review",
     ]
 
-    as_json = subprocess.run(pending + ["--json-event", "UserPromptSubmit"], capture_output=True, text=True, encoding="utf-8")
+    as_json = subprocess.run(
+        [*pending, "--json-event", "UserPromptSubmit"], capture_output=True, text=True, encoding="utf-8"
+    )
     output = json.loads(as_json.stdout)["hookSpecificOutput"]
     assert output["hookEventName"] == "UserPromptSubmit"
     assert output["additionalContext"].endswith("#1 user→claude: @claude review")
@@ -149,13 +150,12 @@ def test_mcp_over_stdio_and_wake_to_codex(server):
         params = StdioServerParameters(
             command=executable("agora-mcp"), args=[], env={"AGORA_PARTICIPANT": "codex", "AGORA_URL": url}
         )
-        async with stdio_client(params) as (read, write):
-            async with ClientSession(read, write) as session:
-                await session.initialize()
-                r = await session.call_tool("pending", {})
-                pending = r.content[0].text
-                r = await session.call_tool("send", {"text": "@user done", "reply_to": 1})
-                return pending, r.content[0].text
+        async with stdio_client(params) as (read, write), ClientSession(read, write) as session:
+            await session.initialize()
+            r = await session.call_tool("pending", {})
+            pending = r.content[0].text
+            r = await session.call_tool("send", {"text": "@user done", "reply_to": 1})
+            return pending, r.content[0].text
 
     httpx.post(f"{url}/api/messages", json={"text": "@codex review the schema & the links"})
     assert wait_for(lambda: log.exists())
@@ -234,11 +234,13 @@ def test_main_with_invalid_role_exits_with_message(tmp_path, monkeypatch):
     from agora.server import main
 
     # Without the validation, main would start uvicorn and the test would hang.
-    monkeypatch.setattr("uvicorn.Server.run", lambda self, *a, **k: pytest.fail("main should not have started the server"))
+    monkeypatch.setattr(
+        "uvicorn.Server.run", lambda self, *a, **k: pytest.fail("main should not have started the server")
+    )
 
     config = tmp_path / "agora.toml"
     config.write_text(
-        '[room]\nport = 8799\n\n'
+        "[room]\nport = 8799\n\n"
         '[[participants]]\nid = "user"\nname = "User"\ntype = "human"\n\n'
         '[[participants]]\nid = "moderator"\nname = "M"\ntype = "agent"\ntool = "claude"\nrole = "moderators"\n',
         encoding="utf-8",

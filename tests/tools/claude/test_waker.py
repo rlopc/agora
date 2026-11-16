@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 import pytest
 
 from agora.core import Message, Participant, WakeError
-
 from agora.tools.claude.waker import ConciergeWaker, find_claude_session
 
 CLAUDE = Participant("claude", "Claude", "agent", "concierge")
@@ -74,7 +73,7 @@ def test_does_nothing_if_the_session_is_listening(sessions, fake_claude):
 
 def test_without_open_session(sessions, fake_claude):
     executable, _ = fake_claude
-    with pytest.raises(WakeError, match="there is no Claude Code session.*waiting for a dialog"):
+    with pytest.raises(WakeError, match=r"there is no Claude Code session.*waiting for a dialog"):
         ConciergeWaker(r"/KnowledgeBase", executable, sessions_dir=sessions).wake(CLAUDE, PENDING)
 
 

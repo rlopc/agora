@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 
 from agora.agents import resolve
-from agora.tools import TOOLS
 from agora.agents.environment import Environment
+from agora.tools import TOOLS
 from agora.tools.claude.config import END, PROJECT_HOOK, PROJECT_MCP, READ_ONLY, START, generate_claude
 
 
@@ -33,7 +33,9 @@ def read(path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-COMMAND = "uv run --quiet --frozen --project /KnowledgeBase agora-pending --participant moderator --url http://127.0.0.1:8766"
+COMMAND = (
+    "uv run --quiet --frozen --project /KnowledgeBase agora-pending --participant moderator --url http://127.0.0.1:8766"
+)
 
 
 def test_generates_mcp_settings_and_claude_md(moderator, tmp_path):
@@ -68,13 +70,20 @@ def test_internal_folder_uses_the_session_folder(moderator, tmp_path):
     environment = replace(environment, project=tmp_path)
     generate_claude(p, environment)
     assert read(tmp_path / ".mcp.json")["mcpServers"]["agora"]["args"] == [
-        "run", "--quiet", "--frozen", "--project", PROJECT_MCP, "agora-mcp",
+        "run",
+        "--quiet",
+        "--frozen",
+        "--project",
+        PROJECT_MCP,
+        "agora-mcp",
     ]
     settings = read(tmp_path / ".claude" / "settings.json")
     for event in ("SessionStart", "UserPromptSubmit"):
         [group] = settings["hooks"][event]
         assert group["hooks"][0]["command"] == COMMAND.replace("/KnowledgeBase", PROJECT_HOOK)
-    assert str(tmp_path) not in (tmp_path / ".mcp.json").read_text() + (tmp_path / ".claude" / "settings.json").read_text()
+    assert (
+        str(tmp_path) not in (tmp_path / ".mcp.json").read_text() + (tmp_path / ".claude" / "settings.json").read_text()
+    )
 
 
 def test_keeps_foreign_hooks_and_permissions(moderator, tmp_path):
@@ -102,7 +111,9 @@ def test_reads_json_with_bom(moderator, tmp_path):
 
 def test_text_outside_the_section_untouched(moderator, tmp_path):
     p, environment = moderator
-    (tmp_path / "CLAUDE.md").write_text(f"@AGENTS.md\n\nMy notes.\n\n{START}\nold\n{END}\n\nMore notes.\n", encoding="utf-8")
+    (tmp_path / "CLAUDE.md").write_text(
+        f"@AGENTS.md\n\nMy notes.\n\n{START}\nold\n{END}\n\nMore notes.\n", encoding="utf-8"
+    )
     generate_claude(p, environment)
     text = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
     assert text.startswith("@AGENTS.md\n\nMy notes.\n\n" + START) and text.endswith(f"{END}\n\nMore notes.\n")

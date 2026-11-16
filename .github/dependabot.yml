@@ -1,0 +1,31 @@
+# Version updates, a week after each release (the same cooldown as uv and mise).
+# Minor and patch updates come in one pull request per ecosystem; each major update in its own.
+# mise.toml is not supported: see .github/workflows/tool-updates.yml.
+# pre-commit is not listed: every hook is local, with its version in a lockfile.
+version: 2
+
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      uv-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      # Its bounds follow uv's version in mise.toml, so uv runs its built-in backend.
+      - dependency-name: uv-build
+    cooldown:
+      default-days: 7
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions-minor-patch:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    cooldown:
+      default-days: 7

@@ -7,7 +7,6 @@ from datetime import UTC, datetime
 import pytest
 
 from agora.core import Message, Participant, WakeError
-
 from agora.tools.codex.waker import CodexQueueWaker
 from agora.tools.notice import compose_notice
 

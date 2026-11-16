@@ -5,9 +5,10 @@ from pathlib import Path
 import pytest
 
 from agora.agents import resolve
-from agora.tools import TOOLS
 from agora.agents.environment import Environment
+from agora.tools import TOOLS
 from agora.tools.codex.config import generate_codex
+
 
 @pytest.fixture
 def aegis(tmp_path):
@@ -37,7 +38,11 @@ def test_generates_full_config(aegis):
     p, environment = aegis
     changed = generate_codex(p, environment)
     config = p.tool_options.home / "config.toml"
-    assert set(changed) == {config, p.tool_options.home / "agents" / "subagent.toml", p.folder / ".codex" / "hooks.json"}
+    assert set(changed) == {
+        config,
+        p.tool_options.home / "agents" / "subagent.toml",
+        p.folder / ".codex" / "hooks.json",
+    }
     c = read(config)
     assert (c["model"], c["model_reasoning_effort"]) == ("gpt-5.6-terra", "high")
     assert "model_provider" not in c
@@ -83,7 +88,9 @@ def test_existing_project_with_another_spelling(aegis):
     p, environment = aegis
     p.tool_options.home.mkdir(parents=True)
     key = str(p.folder) + "/"
-    (p.tool_options.home / "config.toml").write_text(f"[projects.'{key}']\ntrust_level = \"trusted\"\n", encoding="utf-8")
+    (p.tool_options.home / "config.toml").write_text(
+        f"[projects.'{key}']\ntrust_level = \"trusted\"\n", encoding="utf-8"
+    )
     generate_codex(p, environment)
     assert list(read(p.tool_options.home / "config.toml")["projects"]) == [key]
 

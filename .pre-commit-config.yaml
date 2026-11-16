@@ -55,10 +55,23 @@ repos:
         name: zizmor
         entry: mise exec -- zizmor --offline --no-progress
         language: unsupported
-        files: ^(\.github/workflows/[^/]+\.ya?ml|\.pre-commit-config\.yaml)$
+        files: ^(\.github/workflows/[^/]+\.ya?ml|\.github/dependabot\.ya?ml|\.pre-commit-config\.yaml)$
         require_serial: true
 
-      # The project's checks, as in CI. They look at the whole project, not the staged files.
+      # Lint before format, as Ruff recommends.
+      - id: ruff-check
+        name: ruff check
+        entry: mise exec -- uv run --locked ruff check --fix
+        language: unsupported
+        types: [python]
+
+      - id: ruff-format
+        name: ruff format
+        entry: mise exec -- uv run --locked ruff format
+        language: unsupported
+        types: [python]
+
+      # The project's checks. They look at the whole project, not the staged files.
       - id: lint-imports
         name: import layers
         entry: mise exec -- uv run --locked lint-imports

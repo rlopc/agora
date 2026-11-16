@@ -10,7 +10,6 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from agora.core import Message, Participant, WakeError
-
 from agora.paths import same_path
 from agora.tools.notice import compose_notice
 
@@ -36,7 +35,7 @@ def find_codex_session(codex_home: Path, cwd: str | Path) -> str | None:
                 and not (isinstance(data.get("source"), dict) and "subagent" in data["source"])
             ):
                 candidates.append((str(data.get("timestamp", "")), str(data["id"])))
-        except (OSError, ValueError, KeyError, TypeError):
+        except OSError, ValueError, KeyError, TypeError:
             continue
     return max(candidates)[1] if candidates else None
 

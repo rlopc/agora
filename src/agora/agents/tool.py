@@ -9,7 +9,7 @@ from typing import Any, Protocol
 
 from agora.agents.config import ResolvedAgent
 from agora.agents.environment import Environment
-from agora.core import Message, Participant, Waker, WakeError
+from agora.core import Message, Participant, WakeError, Waker
 
 
 @dataclass(frozen=True)

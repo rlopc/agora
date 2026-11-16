@@ -8,7 +8,7 @@ from typing import Any
 
 from agora.agents.config import ResolvedAgent
 from agora.agents.environment import Environment
-from agora.agents.tool import Launch, model_flag, WakeContext
+from agora.agents.tool import Launch, WakeContext, model_flag
 from agora.core import Waker
 from agora.tools.claude.config import generate_claude, own_note
 from agora.tools.claude.waker import ConciergeWaker

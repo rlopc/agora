@@ -90,7 +90,7 @@ def test_human_without_tool():
 
 def test_invalid_type():
     text = NEW_TEXT.replace('type = "human"', 'type = "robot"', 1)
-    with pytest.raises(ConfigError, match="unknown type for user: robot. Valid: agent, human"):
+    with pytest.raises(ConfigError, match=r"unknown type for user: robot\. Valid: agent, human"):
         resolve(tomllib.loads(text), BASE)
 
 
