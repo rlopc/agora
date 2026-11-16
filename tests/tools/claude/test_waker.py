@@ -74,7 +74,7 @@ def test_does_nothing_if_the_session_is_listening(sessions, fake_claude):
 
 def test_without_open_session(sessions, fake_claude):
     executable, _ = fake_claude
-    with pytest.raises(WakeError, match="there is no Claude Code session"):
+    with pytest.raises(WakeError, match="there is no Claude Code session.*waiting for a dialog"):
         ConciergeWaker(r"/KnowledgeBase", executable, sessions_dir=sessions).wake(CLAUDE, PENDING)
 
 

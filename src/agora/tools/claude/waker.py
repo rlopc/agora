@@ -87,7 +87,8 @@ class ConciergeWaker:
             return
         session = find_claude_session(self.cwd, self.sessions_dir)
         if session is None:
-            raise WakeError(f"there is no Claude Code session open in {self.cwd}")
+            # A session that was just launched is not registered until its first dialogs are answered.
+            raise WakeError(f"there is no Claude Code session open in {self.cwd}; is it waiting for a dialog in its window?")
         executable = self._executable or [shutil.which("claude") or "claude"]
         command = executable + [
             "-p",
