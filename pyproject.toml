@@ -27,10 +27,12 @@ dev = [
     "httpx>=0.28",
     "import-linter>=2.16",
     "pyright[nodejs]>=1.1.414",
+    "pre-commit>=4.7",
+    "pre-commit-hooks>=6.0",
 ]
 
 [build-system]
-requires = ["uv_build>=0.10.4,<0.11"]
+requires = ["uv_build>=0.13.7,<0.14"]
 build-backend = "uv_build"
 
 [tool.uv]

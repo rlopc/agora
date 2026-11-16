@@ -41,6 +41,8 @@ uv run lint-imports  # import layers
 uv run pyright       # types
 ```
 
+`uv run pre-commit install` runs these checks (tests only before pushing), a secret scan (gitleaks), the workflow linters (actionlint, zizmor) and some file hygiene hooks on each commit.
+
 ## License
 
 [MIT](LICENSE)
