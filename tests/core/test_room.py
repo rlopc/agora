@@ -155,7 +155,7 @@ def test_what_was_already_shown_in_pending_is_not_rewoken(env):
 
 
 def test_message_arriving_while_the_wake_is_delivered_is_woken_afterwards(env):
-    room, wakers, _, _ = env
+    room, _, _, _ = env
 
     class Slow(FakeWaker):
         def wake(self, participant, pending):

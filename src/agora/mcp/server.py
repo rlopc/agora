@@ -64,9 +64,7 @@ def create_server(client: httpx.Client, participant: str) -> MCPServer:
     @mcp.tool(structured_output=False)
     def send(text: str, reply_to: int | None = None) -> str:
         """Posts a message to the room. Mention recipients with @id; `reply_to` marks the original as read."""
-        data = request(
-            "POST", "/api/messages", json={"author": participant, "text": text, "reply_to": reply_to}
-        ).json()
+        data = request("POST", "/api/messages", json={"author": participant, "text": text, "reply_to": reply_to}).json()
         parts = [f"#{data['message']['id']}"]
         if data["notified"]:
             parts.append("notified: " + ", ".join(f"@{a}" for a in data["notified"]))

@@ -29,6 +29,7 @@ dev = [
     "pyright[nodejs]>=1.1.414",
     "pre-commit>=4.7",
     "pre-commit-hooks>=6.0",
+    "ruff>=0.17.4",
 ]
 
 [build-system]
@@ -38,6 +39,24 @@ build-backend = "uv_build"
 [tool.uv]
 # Skip versions published less than 7 days ago (supply-chain protection), as mise.toml does.
 exclude-newer = "7 days"
+
+[tool.ruff]
+# The line length the code was written with.
+line-length = 120
+
+[tool.ruff.lint]
+select = ["F", "E", "W", "I", "UP", "B", "S", "SIM", "RUF"]
+ignore = [
+    # Left to the formatter.
+    "E501",
+    # Flags every subprocess call; commands are built as lists, never through a shell.
+    "S603",
+    # urlopen only reaches the room's own URL, from agora.toml or --url.
+    "S310",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

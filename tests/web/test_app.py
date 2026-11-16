@@ -6,7 +6,6 @@ from fastapi.testclient import TestClient
 
 from agora.core import Event, Participant, Room
 from agora.store.sqlite import SqliteStore
-
 from agora.web import WebChannel, create_app
 
 PARTICIPANTS = [

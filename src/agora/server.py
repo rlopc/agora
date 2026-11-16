@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import logging
 import os
 import socket
@@ -164,9 +165,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         config = uvicorn.Config(
             server.app, host=server.host, port=server.port, log_level="warning", timeout_graceful_shutdown=2
         )
-        try:
+        # uvicorn re-raises the signal after stopping; as with `uvicorn.run`, it is not an error.
+        with contextlib.suppress(KeyboardInterrupt):
             UvicornServer(config, server.on_stop).run()
-        except KeyboardInterrupt:
-            pass  # uvicorn re-raises the signal after stopping; as with `uvicorn.run`, it is not an error
     finally:
         server.close()

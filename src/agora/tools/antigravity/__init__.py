@@ -9,7 +9,7 @@ from typing import Any
 
 from agora.agents.config import ResolvedAgent
 from agora.agents.environment import Environment
-from agora.agents.tool import Launch, model_flag, WakeContext
+from agora.agents.tool import Launch, WakeContext, model_flag
 from agora.core import Waker
 from agora.tools.antigravity.config import generate_antigravity, own_note
 

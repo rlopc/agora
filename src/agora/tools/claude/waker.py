@@ -17,7 +17,6 @@ from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from agora.core import Message, Participant, WakeError
-
 from agora.paths import same_path
 from agora.tools.notice import compose_notice
 
@@ -52,7 +51,7 @@ def find_claude_session(cwd: str | Path, directory: Path | None = None) -> str |
     for file in directory.glob("*.json"):
         try:
             data = json.loads(file.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+        except OSError, ValueError:
             continue
         if (
             data.get("kind") == "interactive"
@@ -88,9 +87,12 @@ class ConciergeWaker:
         session = find_claude_session(self.cwd, self.sessions_dir)
         if session is None:
             # A session that was just launched is not registered until its first dialogs are answered.
-            raise WakeError(f"there is no Claude Code session open in {self.cwd}; is it waiting for a dialog in its window?")
+            raise WakeError(
+                f"there is no Claude Code session open in {self.cwd}; is it waiting for a dialog in its window?"
+            )
         executable = self._executable or [shutil.which("claude") or "claude"]
-        command = executable + [
+        command = [
+            *executable,
             "-p",
             "--model",
             self.model,

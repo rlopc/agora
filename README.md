@@ -41,9 +41,10 @@ To run the pieces separately: `uv run agora-prepare`, `uv run agora` and `uv run
 uv run pytest        # tests
 uv run lint-imports  # import layers
 uv run pyright       # types
+uv run ruff check    # lint
 ```
 
-`uv run pre-commit install` runs these checks (tests only before pushing), a secret scan (gitleaks), the workflow linters (actionlint, zizmor) and some file hygiene hooks on each commit.
+`uv run pre-commit install` runs these checks (tests only before pushing), Ruff's formatter, a secret scan (gitleaks), the workflow linters (actionlint, zizmor) and some file hygiene hooks on each commit.
 
 ## License
 

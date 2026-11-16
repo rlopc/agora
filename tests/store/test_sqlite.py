@@ -2,7 +2,6 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from agora.core import Participant, Room, Store
-
 from agora.store.sqlite import SqliteStore
 
 _T0 = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
@@ -52,7 +51,6 @@ def check_store(factory: Callable[[], Store]) -> None:
     assert s.paused() is True
     s.set_paused(False)
     assert s.paused() is False
-
 
 
 def test_contract_in_memory():

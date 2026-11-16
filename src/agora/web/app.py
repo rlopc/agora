@@ -12,7 +12,6 @@ from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from agora.core import Message, Room, RoomError, format_line
-
 from agora.web.channel import WebChannel
 
 _STATIC = files("agora.web") / "static"

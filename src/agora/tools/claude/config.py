@@ -71,7 +71,11 @@ def generate_claude(p: ResolvedAgent, environment: Environment, write: bool = Tr
 
     def change_settings(data: dict) -> None:
         events = data.setdefault("hooks", {})
-        own = {"type": "command", "command": pending_command(p.id, environment, project=PROJECT_HOOK if internal else None), "timeout": 10}
+        own = {
+            "type": "command",
+            "command": pending_command(p.id, environment, project=PROJECT_HOOK if internal else None),
+            "timeout": 10,
+        }
         for event in EVENTS:
             groups = [
                 {**g, "hooks": [h for h in g.get("hooks", []) if "agora-pending" not in h.get("command", "")]}

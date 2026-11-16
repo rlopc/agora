@@ -56,9 +56,7 @@ def test_prepares_each_agent_with_its_tool(room, tmp_path):
 
 def test_agent_without_tool_exits_with_message(tmp_path):
     path = tmp_path / "agora.toml"
-    path.write_text(
-        '[[participants]]\nid = "c"\nname = "C"\ntype = "agent"\nwaker = "concierge"\n', encoding="utf-8"
-    )
+    path.write_text('[[participants]]\nid = "c"\nname = "C"\ntype = "agent"\nwaker = "concierge"\n', encoding="utf-8")
     with pytest.raises(SystemExit, match="c does not declare `tool`"):
         main(["--config", str(path)])
     assert sorted(p.name for p in tmp_path.iterdir()) == ["agora.toml"]
@@ -103,7 +101,7 @@ def test_claude_agent_inside_another_folder_is_rejected_without_writing(room, tm
 def test_two_agents_in_the_same_folder_are_rejected(tmp_path):
     path = tmp_path / "agora.toml"
     path.write_text(
-        '[tools.codex]\nhomes = \'' + str(tmp_path / "h") + "'\n\n"
+        "[tools.codex]\nhomes = '" + str(tmp_path / "h") + "'\n\n"
         '[[participants]]\nid = "a"\nname = "A"\ntype = "agent"\nfolder = "."\ntool = "codex"\n\n'
         '[[participants]]\nid = "b"\nname = "B"\ntype = "agent"\ntool = "codex"\n',
         encoding="utf-8",

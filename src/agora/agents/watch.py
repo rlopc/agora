@@ -39,7 +39,15 @@ def fetch_pending(
     with urllib.request.urlopen(f"{url.rstrip('/')}/api/pending?{query}", timeout=timeout + wait) as r:
         data = json.load(r)
     return [
-        Message(d["id"], d["author"], d["text"], tuple(d["mentions"]), d["reply_to"], d["hops"], datetime.fromisoformat(d["created"]))
+        Message(
+            d["id"],
+            d["author"],
+            d["text"],
+            tuple(d["mentions"]),
+            d["reply_to"],
+            d["hops"],
+            datetime.fromisoformat(d["created"]),
+        )
         for d in data
     ]
 
@@ -116,11 +124,13 @@ def main_pending(argv: Sequence[str] | None = None) -> None:
     _utf8_output()
     try:
         pending = fetch_pending(args.url, args.participant, timeout=0.5)
-    except (OSError, ValueError):
+    except OSError, ValueError:
         pending = []
     lines = []
     if pending:
-        lines.append(f"[agora] {len(pending)} pending message(s) for @{args.participant} (handle them with the `agora` MCP):")
+        lines.append(
+            f"[agora] {len(pending)} pending message(s) for @{args.participant} (handle them with the `agora` MCP):"
+        )
         lines.extend(format_line(m) for m in pending)
     if args.json_event:
         output = (

@@ -16,7 +16,20 @@ if TYPE_CHECKING:
     from agora.agents.tool import Tool
 
 # Keys this layer interprets; they do not go into `Participant.options`.
-_OWN = {"id", "name", "type", "role", "waker", "tool", "folder", "model", "effort", "subagents", "read_dirs", "write_dirs"}
+_OWN = {
+    "id",
+    "name",
+    "type",
+    "role",
+    "waker",
+    "tool",
+    "folder",
+    "model",
+    "effort",
+    "subagents",
+    "read_dirs",
+    "write_dirs",
+}
 
 
 class ConfigError(ValueError):

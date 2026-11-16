@@ -244,6 +244,7 @@ From the project root, with the tools from `mise.toml` (`mise install`):
 uv run pytest        # tests
 uv run lint-imports  # import layers
 uv run pyright       # types (src/)
+uv run ruff check    # lint (ruff format formats)
 ```
 
 ## Troubleshooting

@@ -37,7 +37,9 @@ def resolve_options(data: Mapping[str, Any], defaults: Mapping[str, Any], base: 
 
 
 def own_note(p: ResolvedAgent, environment: Environment) -> list[str]:
-    detail = ", ".join(x for x in (p.subagents.model, f"effort {p.subagents.effort}" if p.subagents.effort else None) if x)
+    detail = ", ".join(
+        x for x in (p.subagents.model, f"effort {p.subagents.effort}" if p.subagents.effort else None) if x
+    )
     return [
         "- The room wakes you with `codex queue`; handle the wake with `pending()`.",
         f'- Launch your subagents with `agent_type = "{SUBAGENT}"`' + (f" ({detail})." if detail else "."),
