@@ -33,7 +33,8 @@ def update_toml(path: Path, changes: Callable[[tomlkit.TOMLDocument], None], wri
     document = tomlkit.parse(before)
     changes(document)
     after = tomlkit.dumps(document)
-    if after == before:
+    # A missing file is written even if empty: another file may point to it (Codex's agent roles).
+    if after == before and path.exists():
         return False
     if write:
         _save(path, after)

@@ -143,3 +143,29 @@ def test_notices_ask_to_log_in_when_the_config_changes(aegis):
     assert f"CODEX_HOME={p.tool_options.home} codex login" in notices[0]
     assert "trust the hooks" in notices[1]
     assert TOOLS["codex"].notices(p, generate_codex(p, environment)) == []
+
+
+def test_relative_homes_are_relative_to_the_config(tmp_path):
+    def home(codex, participant=None):
+        config = {
+            "tools": {"codex": codex},
+            "participants": [{"id": "Aegis", "name": "A", "type": "agent", "tool": "codex", **(participant or {})}],
+        }
+        [p] = resolve(config, tmp_path, TOOLS)
+        return p.tool_options.home
+
+    assert home({"homes": "homes"}) == tmp_path / "homes" / "aegis"
+    assert home({}, {"codex_home": "mine"}) == tmp_path / "mine"
+    assert home({"homes": "/abs/homes"}) == Path("/abs/homes/aegis")
+
+
+def test_the_subagent_file_exists_without_subagent_settings(tmp_path):
+    # Codex ignores the agent role if its config_file does not exist.
+    config = {
+        "tools": {"codex": {"homes": "homes"}},
+        "participants": [{"id": "aegis", "name": "A", "type": "agent", "tool": "codex"}],
+    }
+    [p] = resolve(config, tmp_path, TOOLS)
+    generate_codex(p, Environment(url="http://127.0.0.1:8766", project=Path("/KnowledgeBase")))
+    assert (p.tool_options.home / "agents" / "subagent.toml").read_text() == ""
+    assert generate_codex(p, Environment(url="http://127.0.0.1:8766", project=Path("/KnowledgeBase"))) == []
