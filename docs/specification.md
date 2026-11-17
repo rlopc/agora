@@ -177,6 +177,7 @@ All commands accept `--config` (default `agora.toml`) where it applies.
 | `uv run agora-prepare` | Checks the folders and generates each agent's integration. Warns if a running room still uses the previous configuration. | See below. |
 | `uv run agora-launch ID` | Regenerates the agent's configuration if it is out of date and opens its tool in its folder, with its model. | Same as `agora-prepare`, for that agent. |
 | `uv run agora-start` | Refuses an already running room, prepares, opens the room and then each agent in its own window of the `agora` tmux session (`tmux attach -t agora`). | Same as `agora-prepare`. |
+| `uv run agora-archive` | Refuses a running room, copies its database to `archive/<name>-YYYYMMDD-HHMMSS.db` next to it (`data/archive/` by default) and deletes it, so the room starts empty next time. To read an archive, open it with `sqlite3` or start a room whose `db` points to it. | The archived copy. |
 | `uv run agora-mcp --participant ID [--url URL]` | Serves the MCP over stdio; also reads `AGORA_PARTICIPANT` and `AGORA_URL`. Tools run it; you do not. | None. |
 | `uv run agora-watch --participant ID` | Long-polls and prints one line per message when the room wakes the participant. | None. |
 | `uv run agora-pending --participant ID` | For hooks: prints the pending messages, or nothing (also if the room is down). `--json-event EVENT` and `--inject-steps` print the JSON that Codex/Claude and Antigravity hooks expect. | None. |
@@ -258,7 +259,7 @@ uv run ruff check    # lint (ruff format formats)
 
 | Symptom | What to do |
 | --- | --- |
-| Start from scratch | Stop the room and delete its database (`data/agora.db` by default). |
+| Start from scratch | Stop the room and run `agora-archive`: it keeps the messages in `data/archive/`. |
 | `room not available` in the MCP or a hook | Start the room (`uv run agora`, or `agora-start`). |
 | The port is already in use | Another room is running at that address: stop it or choose another port. |
 | An agent does not wake | Check the pause, `max_hops`, `max_moderator_turns`, batching and the error in the UI; see [Wakers](#wakers) for what each tool needs. |

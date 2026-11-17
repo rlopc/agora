@@ -11,7 +11,7 @@ from pathlib import Path
 
 from agora.core import Message, WakeState
 
-__all__ = ["SqliteStore"]
+__all__ = ["SqliteStore", "archive"]
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS messages (
@@ -192,3 +192,22 @@ class SqliteStore:
                 "INSERT INTO state (key, value) VALUES ('paused', ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
                 (json.dumps(value),),
             )
+
+
+def archive(path: Path, folder: Path, when: datetime) -> Path | None:
+    """Copies the database at `path` into `folder` and deletes it, WAL files included; None if there is none.
+
+    `VACUUM INTO` writes a consistent copy that includes what is still only in the WAL file.
+    """
+    if not path.exists():
+        return None
+    folder.mkdir(parents=True, exist_ok=True)
+    target = folder / f"{path.stem}-{when:%Y%m%d-%H%M%S}.db"
+    db = sqlite3.connect(path)
+    try:
+        db.execute("VACUUM INTO ?", (str(target),))
+    finally:
+        db.close()
+    for suffix in ("", "-wal", "-shm"):
+        Path(f"{path}{suffix}").unlink(missing_ok=True)
+    return target

@@ -16,6 +16,8 @@ The project's technical decisions, with their status, when to revisit them and w
 | Each agent tool implements the `Tool` protocol and joins the `TOOLS` registry; tools do not import each other | Final | — | [specification](specification.md#architecture) |
 | One `agora.toml` per room configuration, chosen with `--config` | Final | — | [specification](specification.md#configuration-agoratoml) |
 | Besides the hop limit, the room counts the moderator's messages since the user's last one (`max_moderator_turns`, 6 by default), because the moderator resets the hops | Provisional | Real debates hit the limit too early or loops slip past it | [specification](specification.md#hops-limit-and-pause) |
+| Starting a room from scratch archives its database (`agora-archive`, only with the room stopped) instead of deleting it; the agents' own sessions are not touched | Provisional | Restarting the agents' sessions by hand gets in the way | [specification](specification.md#commands) |
+| A schema change keeps older databases, archived ones included, opening: the store adds what is missing when it starts | Final | — | [sqlite.py](../src/agora/store/sqlite.py) |
 | SQLite is the only store; tests use an in-memory database | Final | — | [specification](specification.md#architecture) |
 | The API has no token: it checks `Host` (DNS rebinding) and `Origin` (other web pages), so any local process can use it | Provisional | The room listens beyond `localhost`, or holds data a local process must not read | [specification](specification.md#permissions-security-and-known-limits) |
 | Versions at least 7 days old: `exclude-newer` in uv, `minimum_release_age` in mise, `cooldown` in Dependabot | Final | — | [pyproject.toml](../pyproject.toml), [mise.toml](../mise.toml) |

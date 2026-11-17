@@ -1,4 +1,4 @@
-"""`agora-prepare`, `agora-launch` and `agora-start`: the agents' commands, with the registered tools."""
+"""`agora-prepare`, `agora-launch`, `agora-start` and `agora-archive`: the room's commands, with the registered tools."""
 
 from __future__ import annotations
 
@@ -9,12 +9,14 @@ import shutil
 import subprocess
 import sys
 from collections.abc import Sequence
+from datetime import datetime
 from pathlib import Path
 
 from agora.agents.config import ConfigError
-from agora.agents.environment import environment_for, room_running, wait_for_room
+from agora.agents.environment import db_path, environment_for, room_running, wait_for_room
 from agora.agents.prepare import agents, load, pending_changes, prepare
 from agora.agents.terminal import open_window
+from agora.store.sqlite import archive
 from agora.tools import TOOLS
 
 
@@ -104,3 +106,20 @@ def main_start(argv: Sequence[str] | None = None) -> None:
     for p in found:
         open_window(p.id, [*uv, "agora-launch", "--config", str(path), p.id], p.folder)
     print(f"Room at {environment.url}; agents: {', '.join(p.id for p in found)}. Open them with: tmux attach -t agora")
+
+
+def main_archive(argv: Sequence[str] | None = None) -> None:
+    """Moves the room's database to `archive/` next to it, so the next room starts empty."""
+    args = _config("Archives the room's messages and leaves it empty.", argv)
+    path = args.config
+    config = load(path)
+    environment = environment_for(config, path.parent)
+    if room_running(environment.url):
+        # The running room would keep writing to the database being archived.
+        raise SystemExit(f"A room is running at {environment.url}: stop it before archiving.")
+    db = db_path(config, path.parent)
+    target = archive(db, db.parent / "archive", datetime.now())
+    if target is None:
+        print(f"Nothing to archive: {db} does not exist.")
+        return
+    print(f"Archived to {target}. The room starts empty next time.")

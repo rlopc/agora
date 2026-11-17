@@ -106,3 +106,35 @@ def test_prepare_warns_if_the_room_is_already_running(monkeypatch, tmp_path, cap
     monkeypatch.setattr(cli, "room_running", lambda url: True)
     cli.main_prepare(["--config", str(path)])
     assert "restart it" in capsys.readouterr().out
+
+
+def test_archive_leaves_the_room_empty(monkeypatch, tmp_path, capsys):
+    path = tmp_path / "agora.toml"
+    path.write_text('[room]\ndb = "data/room.db"\n', encoding="utf-8")
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "room.db").touch()
+    monkeypatch.setattr(cli, "room_running", lambda url: False)
+    cli.main_archive(["--config", str(path)])
+    assert not (tmp_path / "data" / "room.db").exists()
+    [archived] = (tmp_path / "data" / "archive").iterdir()
+    assert archived.name.startswith("room-")
+    assert str(archived) in capsys.readouterr().out
+
+
+def test_archive_without_database(monkeypatch, tmp_path, capsys):
+    path = tmp_path / "agora.toml"
+    path.write_text("", encoding="utf-8")
+    monkeypatch.setattr(cli, "room_running", lambda url: False)
+    cli.main_archive(["--config", str(path)])
+    assert "Nothing to archive" in capsys.readouterr().out
+
+
+def test_archive_stops_if_the_room_is_running(monkeypatch, tmp_path):
+    path = tmp_path / "agora.toml"
+    path.write_text("", encoding="utf-8")
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "agora.db").touch()
+    monkeypatch.setattr(cli, "room_running", lambda url: True)
+    with pytest.raises(SystemExit, match="stop it before archiving"):
+        cli.main_archive(["--config", str(path)])
+    assert (tmp_path / "data" / "agora.db").exists()
