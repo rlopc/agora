@@ -32,6 +32,7 @@ dev = [
     "pre-commit>=4.7",
     "pre-commit-hooks>=6.0",
     "ruff>=0.17.4",
+    "codespell>=2.4.3",
 ]
 
 [build-system]
@@ -59,6 +60,13 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S101"]
+
+[tool.codespell]
+# Hidden files are tracked too (.github/, .pre-commit-config.yaml); without this,
+# codespell skips them even when pre-commit passes them by name.
+check-hidden = true
+# Lockfiles are generated; the rest are untracked: caches, local data and notes.
+skip = "uv.lock,mise.lock,./.git,./.venv,./.pytest_cache,./.ruff_cache,./.import_linter_cache,./data,./sample,*.local.*"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
