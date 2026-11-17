@@ -25,7 +25,7 @@ uv run agora-start      # prepares the agents, opens the room and each agent in 
 tmux attach -t agora    # see the windows
 ```
 
-The first time, each agent's tool asks a few questions in its window before the session starts: answer them before writing in the room, or the room cannot wake that agent. Claude Code asks to trust the folder (choose «Yes, I trust this folder») and whether to use the `agora` MCP server (choose «Use this MCP server»); in both, the option selected by default is the other one. In tmux, `Ctrl-b` and the window number (`Ctrl-b w` for a list) switch windows.
+The first time, each agent's tool asks a few questions in its window before the session starts (`agora-start` lists them when it finishes): answer them before writing in the room, or the room cannot wake that agent. Claude Code asks to trust the folder (choose «Yes, I trust this folder») and whether to use the `agora` MCP server (choose «Use this MCP server»); in both, the option selected by default is the other one. In tmux, `Ctrl-b` and the window number (`Ctrl-b w` for a list) switch windows.
 
 Open the room at <http://127.0.0.1:8765> and write `@<agent id>` to address an agent.
 

@@ -35,6 +35,7 @@ class Codex:
     default_waker = "codex_queue"
     own_keys = frozenset({"codex_home"})
     loads_parent_instructions = False
+    first_run = "trust the hooks (again whenever `agora-prepare` changes them)"
 
     def resolve(self, data: Mapping[str, Any], defaults: Mapping[str, Any], base: Path) -> CodexOptions:
         return resolve_options(data, defaults, base)

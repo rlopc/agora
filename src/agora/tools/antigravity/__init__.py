@@ -23,6 +23,7 @@ class Antigravity:
     default_waker = None
     own_keys = frozenset()
     loads_parent_instructions = True  # AGENTS.md and rules of parent folders, up to the repository root
+    first_run = "trust the folder"
 
     def resolve(self, data: Mapping[str, Any], defaults: Mapping[str, Any], base: Path) -> None:
         return None

@@ -54,6 +54,8 @@ class Tool(Protocol):
     own_keys: frozenset[str]
     # The tool loads the instructions of parent folders: its agent cannot be inside another's folder.
     loads_parent_instructions: bool
+    # What the tool asks in its window the first time, before the room can reach the agent.
+    first_run: str
 
     def resolve(self, data: Mapping[str, Any], defaults: Mapping[str, Any], base: Path) -> Any:
         """The tool's own options (`ResolvedAgent.tool_options`) from the participant and `[tools.<name>]`."""
