@@ -29,6 +29,12 @@ def environment_for(config: Mapping[str, Any], base: Path) -> Environment:
     )
 
 
+def db_path(config: Mapping[str, Any], base: Path) -> Path:
+    """The room's SQLite database; a relative path is relative to the folder of agora.toml."""
+    path = Path(config.get("room", {}).get("db", "data/agora.db"))
+    return path if path.is_absolute() else base / path
+
+
 def room_running(url: str) -> bool:
     """Is a room already answering at `url`? (quick check, no waiting)."""
     try:

@@ -17,6 +17,7 @@ from typing import Any
 from fastapi import FastAPI
 
 from agora.agents import ConfigError, ResolvedAgent, ResolvedParticipant, resolve, to_participant
+from agora.agents.environment import db_path
 from agora.agents.tool import Tool, UnconfiguredWaker, WakeContext
 from agora.agents.watch import WatchWaker
 from agora.core import MAX_HOPS, MAX_MODERATOR_TURNS, Room, RoomError, Waker
@@ -75,8 +76,7 @@ def build(
     if not participants:
         raise ValueError("agora.toml defines no participants")
 
-    db_path = Path(settings.get("db", "data/agora.db"))
-    store = SqliteStore(db_path if db_path.is_absolute() else base / db_path)
+    store = SqliteStore(db_path(config, base))
     channel = WebChannel()
     threads = ThreadPoolExecutor(max_workers=4, thread_name_prefix="wake")
 

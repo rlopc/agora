@@ -3,7 +3,7 @@ from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
 from agora.core import Participant, Room, Store
-from agora.store.sqlite import SqliteStore
+from agora.store.sqlite import SqliteStore, archive
 
 _T0 = datetime(2026, 10, 29, 12, 0, tzinfo=UTC)
 
@@ -93,3 +93,21 @@ def test_persists_across_openings(tmp_path):
     reopened = SqliteStore(path)
     assert [m.text for m in reopened.pending("codex")] == ["@codex hello"]
     assert reopened.paused() is True
+
+
+def test_archive_copies_the_database_and_deletes_it(tmp_path):
+    db = tmp_path / "agora.db"
+    store = SqliteStore(db)
+    store.add_message("user", "hello", [], None, 0, _T0)
+    store.close()
+    target = archive(db, tmp_path / "archive", datetime(2026, 11, 17, 9, 5, 3))
+    assert target == tmp_path / "archive" / "agora-20261117-090503.db"
+    assert [p.name for p in tmp_path.iterdir()] == ["archive"]
+    copy = SqliteStore(target)
+    assert [m.text for m in copy.messages()] == ["hello"]
+    copy.close()
+
+
+def test_archive_without_database(tmp_path):
+    assert archive(tmp_path / "agora.db", tmp_path / "archive", _T0) is None
+    assert not (tmp_path / "archive").exists()
