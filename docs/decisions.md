@@ -25,5 +25,6 @@ The project's technical decisions, with their status, when to revisit them and w
 | Every pre-commit hook is local and runs a locked tool; pytest runs only before pushing; CI runs every hook again | Final | — | [.pre-commit-config.yaml](../.pre-commit-config.yaml) |
 | Ruff with a short rule set (`F`, `E`, `W`, `I`, `UP`, `B`, `S`, `SIM`, `RUF`) and the line length the code had (120) | Provisional | Widen the rule set when a rule earns its place | [pyproject.toml](../pyproject.toml) |
 | pyright checks `src/` only, not the tests | Provisional | The tests stop relying on hand-narrowed types and test doubles | [pyproject.toml](../pyproject.toml) |
+| Pull requests are merged with squash only, with the PR title as the commit message on `main`; titles are plain imperative sentences, not validated | Provisional | Agora gets releases: then Conventional Commits and a PR title check | [CONTRIBUTING](../CONTRIBUTING.md) |
 | No releases yet: Agora is used from a clone of `main` | Provisional | Someone needs a versioned install | [README](../README.md) |
 | MIT license | Final | — | [LICENSE](../LICENSE) |
