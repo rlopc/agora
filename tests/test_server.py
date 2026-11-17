@@ -328,3 +328,23 @@ def test_codex_without_thread_with_folder_finds_its_session(tmp_path):
         assert w.current_thread() == ""
     finally:
         s.close()
+
+
+def test_permission_notice(server):
+    url, _ = server
+    permission = [executable("agora-permission"), "--participant", "claude", "--url", url]
+    request = {"tool_name": "Bash", "tool_input": {"command": "rm -rf build", "description": "Clean"}}
+    result = subprocess.run(permission, input=json.dumps(request), capture_output=True, text=True, encoding="utf-8")
+    assert result.returncode == 0 and result.stdout == ""
+    [message] = httpx.get(f"{url}/api/messages").json()
+    assert message["author"] == "claude" and message["mentions"] == ["user"]
+    assert message["text"] == "@user `claude` is waiting for permission in its terminal: `Bash: rm -rf build`"
+
+    down = subprocess.run(
+        [executable("agora-permission"), "--participant", "claude", "--url", "http://127.0.0.1:9"],
+        input=json.dumps(request),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+    )
+    assert down.returncode == 0 and down.stdout == ""

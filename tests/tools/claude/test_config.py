@@ -37,6 +37,8 @@ COMMAND = (
     "uv run --quiet --frozen --project /KnowledgeBase agora-pending --participant moderator --url http://127.0.0.1:8766"
 )
 
+PERMISSION = COMMAND.replace("agora-pending", "agora-permission")
+
 
 def test_generates_mcp_settings_and_claude_md(moderator, tmp_path):
     p, environment = moderator
@@ -49,6 +51,9 @@ def test_generates_mcp_settings_and_claude_md(moderator, tmp_path):
     settings = read(tmp_path / ".claude" / "settings.json")
     for event in ("SessionStart", "UserPromptSubmit"):
         assert settings["hooks"][event] == [{"hooks": [{"type": "command", "command": COMMAND, "timeout": 10}]}]
+    assert settings["hooks"]["PermissionRequest"] == [
+        {"hooks": [{"type": "command", "command": PERMISSION, "timeout": 10}]}
+    ]
     assert settings["permissions"]["allow"] == ["mcp__agora", *READ_ONLY]
     assert all(not r.startswith("Bash(rm") for r in READ_ONLY)
     assert settings["permissions"]["additionalDirectories"] == [r"/Dev/WorkSpace/AegisWS"]
@@ -81,6 +86,8 @@ def test_internal_folder_uses_the_session_folder(moderator, tmp_path):
     for event in ("SessionStart", "UserPromptSubmit"):
         [group] = settings["hooks"][event]
         assert group["hooks"][0]["command"] == COMMAND.replace("/KnowledgeBase", PROJECT_HOOK)
+    [group] = settings["hooks"]["PermissionRequest"]
+    assert group["hooks"][0]["command"] == PERMISSION.replace("/KnowledgeBase", PROJECT_HOOK)
     assert (
         str(tmp_path) not in (tmp_path / ".mcp.json").read_text() + (tmp_path / ".claude" / "settings.json").read_text()
     )

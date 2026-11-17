@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from agora.agents.config import ResolvedAgent
-from agora.agents.environment import Environment, mcp_server, pending_command
+from agora.agents.environment import Environment, hook_command, mcp_server, pending_command
 from agora.agents.merge import update_json
 from agora.agents.notes import note
 
@@ -71,17 +71,21 @@ def generate_claude(p: ResolvedAgent, environment: Environment, write: bool = Tr
 
     def change_settings(data: dict) -> None:
         events = data.setdefault("hooks", {})
-        own = {
+        project = PROJECT_HOOK if internal else None
+        pending = {"type": "command", "command": pending_command(p.id, environment, project=project), "timeout": 10}
+        permission = {
             "type": "command",
-            "command": pending_command(p.id, environment, project=PROJECT_HOOK if internal else None),
+            "command": hook_command("agora-permission", p.id, environment, project),
             "timeout": 10,
         }
-        for event in EVENTS:
+        own = {event: ("agora-pending", pending) for event in EVENTS}
+        own["PermissionRequest"] = ("agora-permission", permission)
+        for event, (name, hook) in own.items():
             groups = [
-                {**g, "hooks": [h for h in g.get("hooks", []) if "agora-pending" not in h.get("command", "")]}
+                {**g, "hooks": [h for h in g.get("hooks", []) if name not in h.get("command", "")]}
                 for g in events.get(event, [])
             ]
-            events[event] = [g for g in groups if g["hooks"]] + [{"hooks": [own]}]
+            events[event] = [g for g in groups if g["hooks"]] + [{"hooks": [hook]}]
         permissions = data.setdefault("permissions", {})
         allowed = permissions.setdefault("allow", [])
         allowed.extend(r for r in ["mcp__agora", *READ_ONLY] if r not in allowed)

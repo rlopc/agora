@@ -28,7 +28,7 @@ flowchart LR
   C --> K[wakers]
   K --> CQ[codex queue]
   K --> CC[Claude concierge]
-  H[agent hooks] -->|agora-pending| W
+  H[agent hooks] -->|agora-pending, agora-permission| W
   G[agora-prepare / launch / start] --> A
 ```
 
@@ -40,7 +40,7 @@ The package `agora` (in `src/`) has these layers; `import-linter` enforces them:
 | `store` | SQLite store (WAL) for messages, mentions, reads, wakes and state. Depends only on `core`. |
 | `web` | Web UI, HTTP API and server-sent events. Depends only on `core`. |
 | `mcp` | Thin stdio MCP server: an HTTP client of the API, with no access to the store or the wakers. |
-| `agents` | What every agent shares: `agora.toml` resolution, the `Tool` contract, preparation, notes, tmux and the `agora-watch`/`agora-pending` commands. |
+| `agents` | What every agent shares: `agora.toml` resolution, the `Tool` contract, preparation, notes, tmux and the `agora-watch`/`agora-pending`/`agora-permission` commands. |
 | `tools/<tool>` | One package per tool (`claude`, `codex`, `antigravity`) implementing `Tool`. Tools do not import each other. |
 | `server`, `cli` | Composition: build the room from `agora.toml` and expose the commands. |
 
@@ -177,12 +177,13 @@ All commands accept `--config` (default `agora.toml`) where it applies.
 | `uv run agora-mcp --participant ID [--url URL]` | Serves the MCP over stdio; also reads `AGORA_PARTICIPANT` and `AGORA_URL`. Tools run it; you do not. | None. |
 | `uv run agora-watch --participant ID` | Long-polls and prints one line per message when the room wakes the participant. | None. |
 | `uv run agora-pending --participant ID` | For hooks: prints the pending messages, or nothing (also if the room is down). `--json-event EVENT` and `--inject-steps` print the JSON that Codex/Claude and Antigravity hooks expect. | None. |
+| `uv run agora-permission --participant ID` | For `PermissionRequest` hooks: reads the request from stdin and posts to the room, mentioning the user, that the agent is waiting for permission and for what. It prints nothing, so the tool's own prompt stays; it does nothing if the room is down. | None. |
 
 What `agora-prepare` generates for each tool:
 
 | Tool | Files | Notes |
 | --- | --- | --- |
-| Claude Code | `<folder>/.mcp.json`, `<folder>/.claude/settings.json` and the section of `<folder>/CLAUDE.md` between `<!-- agora-prepare: start -->` and `<!-- agora-prepare: end -->` | Hooks on `SessionStart` and `UserPromptSubmit`. Inside the room's project, paths use `${CLAUDE_PROJECT_DIR}` so the files can be versioned. Claude Code asks to approve `.mcp.json` when the session opens. |
+| Claude Code | `<folder>/.mcp.json`, `<folder>/.claude/settings.json` and the section of `<folder>/CLAUDE.md` between `<!-- agora-prepare: start -->` and `<!-- agora-prepare: end -->` | Hooks on `SessionStart` and `UserPromptSubmit`, and on `PermissionRequest` to tell the room when the agent waits for permission. Inside the room's project, paths use `${CLAUDE_PROJECT_DIR}` so the files can be versioned. Claude Code asks to approve `.mcp.json` when the session opens. |
 | Codex | `CODEX_HOME/config.toml`, `CODEX_HOME/agents/subagent.toml` and `<folder>/.codex/hooks.json` | Hooks on `SessionStart` and `UserPromptSubmit`. The agent's note goes in `developer_instructions`. Codex asks to trust the hooks again whenever `hooks.json` changes. |
 | Antigravity CLI | `<folder>/.agents/mcp_config.json`, `<folder>/.agents/hooks.json` and `<folder>/.agents/rules/agora.md` | Hooks on `SessionStart` and `PreInvocation`. The rule is always applied (`trigger: always_on`). `agy` asks to trust the folder the first time. |
 
@@ -231,7 +232,7 @@ A session that was already open must be restarted to load the MCP.
 
 - The API only accepts the hosts `127.0.0.1`, `localhost` and the configured host, as protection against DNS rebinding.
 - A request with an `Origin` header is accepted only from the room's own page (`http://<host>:<port>` for those hosts), so another web page open in the browser cannot post or wake agents. Requests without `Origin` (agents, commands) are not rejected for it; any local process can still use the API.
-- **Claude Code** is allowed the `agora` MCP tools and a fixed list of read-only commands (`ls`, `cat`, `head`, `wc`, `rg`, `git log/show/status`). `read_dirs` and `write_dirs` both become `additionalDirectories`, which does not distinguish reading from writing. Agora adds no `deny` rules, but keeps any already in `settings.json`.
+- **Claude Code** is allowed the `agora` MCP tools and a fixed list of read-only commands (`ls`, `cat`, `head`, `wc`, `rg`, `git log/show/status`). `read_dirs` and `write_dirs` both become `additionalDirectories`, which does not distinguish reading from writing. Agora adds no `deny` rules, but keeps any already in `settings.json`. Other permission prompts are answered in the agent's terminal; the room only says which agent is waiting and for what. That notice is an agent message, so it counts as a hop.
 - **Codex** runs with `sandbox_mode = "workspace-write"` and `approval_policy = "never"`: nobody watches the console, so an operation outside the sandbox fails instead of asking. `write_dirs` become `writable_roots`; `read_dirs` add nothing to Codex's configuration.
 - **Antigravity CLI** runs in `accept-edits` mode: edits are accepted and commands ask for approval in its terminal. `read_dirs` and `write_dirs` are added with `--add-dir`.
 - Reading limits are not enforced by Agora: reinforce them with instructions, scope and human review.
