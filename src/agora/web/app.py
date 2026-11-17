@@ -28,6 +28,11 @@ class NewMessage(BaseModel):
     text: str = Field(min_length=1, max_length=20_000)
     author: str | None = None
     reply_to: int | None = None
+    blind: bool = False
+
+
+class CloseRound(BaseModel):
+    participant: str | None = None
 
 
 class Read(BaseModel):
@@ -101,24 +106,39 @@ def create_app(
         }
 
     @app.get("/api/messages")
-    def messages(since: int = 0, limit: int = Query(200, ge=1, le=1000)) -> list[dict]:
-        return [m.as_dict() for m in room.messages(since, limit)]
+    def messages(since: int = 0, limit: int = Query(200, ge=1, le=1000), participant: str | None = None) -> list[dict]:
+        return [m.as_dict() for m in run(room.messages, since, limit, participant)]
 
     @app.get("/api/history")
-    def history(since: int | None = None, limit: int = Query(20, ge=1, le=200), format: Format = "json"):
-        return _output(room.history(since, limit), format)
+    def history(
+        since: int | None = None,
+        limit: int = Query(20, ge=1, le=200),
+        format: Format = "json",
+        participant: str | None = None,
+    ):
+        """Without `participant`, the user's view; with it, what that participant may see."""
+        return _output(run(room.history, since, limit, participant), format)
 
     @app.post("/api/messages")
     def send(new: NewMessage) -> dict:
         author = new.author or (room.human.id if room.human else None)
         if author is None:
             raise HTTPException(400, "author is missing")
-        result = run(room.send, author, new.text, new.reply_to)
+        result = run(room.send, author, new.text, new.reply_to, blind=new.blind)
         return {
             "message": result.message.as_dict(),
             "unknown": list(result.unknown),
             "notified": list(result.notified),
+            "held": list(result.held),
         }
+
+    @app.post("/api/round/close")
+    def close_round(close: CloseRound | None = None) -> dict:
+        by = (close.participant if close else None) or (room.human.id if room.human else None)
+        if by is None:
+            raise HTTPException(400, "participant is missing")
+        run(room.close_round, by)
+        return room.state()
 
     @app.get("/api/pending")
     async def pending(

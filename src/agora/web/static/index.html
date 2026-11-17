@@ -15,6 +15,7 @@
     <div class="controls">
       <ul id="participants" class="participants" aria-label="Participants"></ul>
       <button id="alerts" type="button" class="button" title="Notify me when a message mentions me and this page is in the background" hidden>Enable notifications</button>
+      <button id="round-close" type="button" class="button" title="Show every answer now, without waiting for the rest" hidden>Close blind round</button>
       <button id="pause" type="button" class="button" aria-pressed="false">Pause wakes</button>
     </div>
   </header>
@@ -31,6 +32,9 @@
     </div>
     <div class="row">
       <textarea id="text" rows="2" placeholder="Write a message… (Enter sends, Shift+Enter new line)" aria-label="Message"></textarea>
+      <label class="blind" title="The mentioned agents answer without seeing each other's answers until all of them have replied">
+        <input id="blind" type="checkbox"> Blind round
+      </label>
       <button type="submit" class="button primary">Send</button>
     </div>
   </form>

@@ -45,7 +45,7 @@ def setup():
 def test_exposed_tools(setup):
     mcp, _, _ = setup
     names = {t.name for t in asyncio.run(mcp.list_tools())}
-    assert names == {"pending", "send", "mark_read", "history"}
+    assert names == {"pending", "send", "mark_read", "history", "close_round"}
 
 
 def test_full_conversation(setup):
@@ -80,3 +80,16 @@ def test_readable_errors(setup):
     down = create_server(httpx.Client(base_url="http://127.0.0.1:9", timeout=1), "claude")
     with pytest.raises(ToolError, match="room not available"):
         call(down, "pending")
+
+
+def test_blind_round(setup):
+    mcp, room, _ = setup
+    room.send("user", "@claude @codex which database?", blind=True)
+    room.send("codex", "Postgres", reply_to=1)
+    assert text(call(mcp, "history")) == "#1 user→claude,codex: @claude @codex which database?"
+    assert text(call(mcp, "send", text="SQLite, unlike @codex", reply_to=1)) == (
+        "#3 · held until the blind round closes: @codex"
+    )
+    assert len(text(call(mcp, "history")).splitlines()) == 3
+    with pytest.raises(ToolError, match="no open blind round"):
+        call(mcp, "close_round")
