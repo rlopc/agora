@@ -45,8 +45,8 @@ def main_prepare(argv: Sequence[str] | None = None) -> None:
         return
     for p in agents(config, path.parent, TOOLS):
         changed = result[p.id]
-        status = f"{len(changed)} files updated" if changed else "up to date"
-        print(f"- {p.id} ({p.tool}, {p.model}): {status}")
+        status = f"{len(changed)} file{'s' if len(changed) > 1 else ''} updated" if changed else "up to date"
+        print(f"- {p.id} ({p.tool}, {p.model or 'default model'}): {status}")
         for notice in TOOLS[p.tool].notices(p, changed):
             print(f"  {notice}")
     url = environment_for(config, path.parent).url
@@ -78,7 +78,7 @@ def main_launch(argv: Sequence[str] | None = None) -> None:
     executable = shutil.which(launch.argv[0])
     if executable is None:
         raise SystemExit(f'Cannot find the command "{launch.argv[0]}". Install it and try again.')
-    print(f"Starting {p.tool} ({p.id}) with {p.model} in {p.folder}")
+    print(f"Starting {p.tool} ({p.id}) with {p.model or 'its default model'} in {p.folder}")
     raise SystemExit(subprocess.run([executable, *launch.argv[1:]], cwd=launch.cwd, env=launch.env).returncode)
 
 

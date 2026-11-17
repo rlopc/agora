@@ -141,3 +141,21 @@ def test_archive_stops_if_the_room_is_running(monkeypatch, tmp_path):
     with pytest.raises(SystemExit, match="stop it before archiving"):
         cli.main_archive(["--config", str(path)])
     assert (tmp_path / "data" / "agora.db").exists()
+
+
+def test_prepare_and_launch_without_model_name_the_default(monkeypatch, tmp_path, capsys):
+    path = tmp_path / "agora.toml"
+    path.write_text(
+        '[[participants]]\nid = "m"\nname = "M"\ntype = "agent"\nfolder = "."\ntool = "claude"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(cli, "room_running", lambda url: False)
+    cli.main_prepare(["--config", str(path)])
+    out = capsys.readouterr().out
+    assert "- m (claude, default model): " in out and "None" not in out
+
+    monkeypatch.setattr(cli.shutil, "which", lambda name: "/bin/true")
+    monkeypatch.setattr(cli.subprocess, "run", lambda *args, **kwargs: type("Done", (), {"returncode": 0})())
+    with pytest.raises(SystemExit):
+        cli.main_launch(["--config", str(path), "m"])
+    assert "with its default model in" in capsys.readouterr().out
