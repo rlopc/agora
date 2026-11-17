@@ -18,6 +18,7 @@ class Store(Protocol):
         reply_to: int | None,
         hops: int,
         created: datetime,
+        turns: int = 0,
     ) -> Message: ...
 
     def get_message(self, id: int) -> Message | None: ...

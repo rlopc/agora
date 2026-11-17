@@ -30,6 +30,7 @@ class Message:
     reply_to: int | None
     hops: int
     created: datetime
+    turns: int = 0
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -40,6 +41,7 @@ class Message:
             "reply_to": self.reply_to,
             "hops": self.hops,
             "created": self.created.isoformat(),
+            "turns": self.turns,
         }
 
 

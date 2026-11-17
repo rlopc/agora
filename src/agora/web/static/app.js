@@ -197,6 +197,9 @@ function renderState(s) {
   } else if (s.limit_reached) {
     pill.textContent = `Limit of ${s.max_hops} hops: waiting for your reply`;
     pill.classList.add("limit");
+  } else if (s.turn_limit_reached) {
+    pill.textContent = `Limit of ${s.max_moderator_turns} moderator turns: waiting for your reply`;
+    pill.classList.add("limit");
   } else if (withError.length) {
     pill.textContent = `Could not wake ${withError.map((p) => "@" + p.id).join(", ")}`;
     pill.classList.add("error");

@@ -5,6 +5,7 @@
 port = 8765
 db = "data/agora.db"
 max_hops = 3
+max_moderator_turns = 6
 # project = "/path/to/agora"   # needed only if this folder is not run with agora's uv project
 
 [tools.claude]

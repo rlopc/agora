@@ -1,4 +1,4 @@
-"""Room rules: mentions, hops, batching of wakes and pause."""
+"""Room rules: mentions, hops, moderator turns, batching of wakes and pause."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ from agora.core.model import ROLES, Event, Message, Participant
 from agora.core.ports import Channel, Store, WakeError, Waker
 
 MAX_HOPS = 3
+MAX_MODERATOR_TURNS = 6
 
 
 class RoomError(ValueError):
@@ -44,6 +45,7 @@ class Room:
         wakers: Mapping[str, Waker] | None = None,
         *,
         max_hops: int = MAX_HOPS,
+        max_moderator_turns: int = MAX_MODERATOR_TURNS,
         clock: Callable[[], datetime] = _now,
         executor: Callable[[Callable[[], None]], None] = _immediate,
         retry_delay: float = 5.0,
@@ -59,6 +61,7 @@ class Room:
         self.channels = list(channels)
         self.wakers = dict(wakers or {})
         self.max_hops = max_hops
+        self.max_moderator_turns = max_moderator_turns
         self._clock = clock
         self._executor = executor
         self._retry_delay = retry_delay
@@ -99,9 +102,15 @@ class Room:
             mentions = tuple(p.id for p in self.participants.values() if p.role == "moderator")
         last = self.store.last_message()
         hops = 0 if participant.type == "human" or participant.role == "moderator" else (last.hops if last else 0) + 1
+        # The moderator resets the hops, so its own messages since the user's last one are counted apart.
+        turns = (
+            0
+            if participant.type == "human"
+            else (last.turns if last else 0) + (1 if participant.role == "moderator" else 0)
+        )
 
         now = self._clock()
-        message = self.store.add_message(author, text, mentions, reply_to, hops, now)
+        message = self.store.add_message(author, text, mentions, reply_to, hops, now, turns)
         if reply_to is not None:
             self.store.mark_read(author, [reply_to], now)
         if participant.type == "agent":
@@ -175,7 +184,7 @@ class Room:
         self._publish("state", self.state())
 
     def wake_now(self, participant: str) -> None:
-        """Manual wake: ignores the pause and the hop limit."""
+        """Manual wake: ignores the pause and the limits."""
         p = self._participant(participant)
         if participant not in self.wakers:
             raise RoomError(f"@{p.id} has no waker")
@@ -187,6 +196,7 @@ class Room:
     def state(self) -> dict[str, Any]:
         last = self.store.last_message()
         hops = last.hops if last else 0
+        turns = last.turns if last else 0
         participants = {}
         for p in self.participants.values():
             wake = self.store.wake_state(p.id)
@@ -201,6 +211,9 @@ class Room:
             "max_hops": self.max_hops,
             "hops": hops,
             "limit_reached": hops >= self.max_hops,
+            "max_moderator_turns": self.max_moderator_turns,
+            "moderator_turns": turns,
+            "turn_limit_reached": turns > self.max_moderator_turns,
             "participants": participants,
         }
 
@@ -216,13 +229,17 @@ class Room:
         participant = self.participants[target]
         if participant.type != "agent" or target not in self.wakers:
             return False
-        if self.store.paused() or message.hops >= self.max_hops:
+        if self.store.paused() or self._over_limit(message):
             return False
         wake = self.store.wake_state(target)
         if wake.last_wake is None or wake.error:
             return True
         # Batching: if there is already a wake after their last activity, it is not repeated.
         return wake.last_activity is not None and wake.last_activity >= wake.last_wake
+
+    def _over_limit(self, message: Message) -> bool:
+        """Stored but wakes nobody: the room waits for the user."""
+        return message.hops >= self.max_hops or message.turns > self.max_moderator_turns
 
     def _wake(self, target: str) -> None:
         participant = self.participants[target]
@@ -259,7 +276,7 @@ class Room:
             return
         with self._seen_lock:
             seen = self._seen.get(target, self._initial_seen)
-            new = [m.id for m in self.store.pending(target, seen) if m.hops < self.max_hops]
+            new = [m.id for m in self.store.pending(target, seen) if not self._over_limit(m)]
             if not new:
                 return
             self._seen[target] = new[-1]
