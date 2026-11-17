@@ -66,7 +66,32 @@ function time(iso) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-function renderMessage(m, { highlight = false } = {}) {
+/** The button is offered only while the browser has not been asked yet. */
+function renderAlerts() {
+  $("alerts").hidden = !("Notification" in window) || Notification.permission !== "default";
+}
+
+async function enableAlerts() {
+  const permission = await Notification.requestPermission();
+  renderAlerts();
+  if (permission === "denied") notify("Notifications are blocked; allow them in the browser's site settings", "info");
+}
+
+/** Browser notification for a mention of the user while the page is not in front. */
+function alertMention(m) {
+  if (m.author === state.human || !m.mentions.includes(state.human)) return;
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  if (document.visibilityState === "visible" && document.hasFocus()) return;
+  const text = m.text.length > 200 ? `${m.text.slice(0, 200)}…` : m.text;
+  const shown = new Notification(`${nameOf(m.author)} mentioned you`, { body: text, tag: `agora-m${m.id}` });
+  shown.addEventListener("click", () => {
+    window.focus();
+    $(`m${m.id}`)?.scrollIntoView({ block: "center" });
+    shown.close();
+  });
+}
+
+function renderMessage(m, { highlight = false, alert = false } = {}) {
   if (m.id <= state.lastId) return;
   state.lastId = m.id;
   $("empty").hidden = true;
@@ -122,6 +147,7 @@ function renderMessage(m, { highlight = false } = {}) {
     state.unseen += 1;
     renderNew();
   }
+  if (alert) alertMention(m);
 }
 
 function isAtBottom() {
@@ -270,7 +296,7 @@ async function send(event) {
 
 async function catchUp() {
   const fresh = await api(`/api/messages?since=${state.lastId}&limit=1000`);
-  fresh.forEach((m) => renderMessage(m));
+  fresh.forEach((m) => renderMessage(m, { alert: true }));
   renderState(await api("/api/state"));
 }
 
@@ -283,7 +309,7 @@ function connect() {
     pill.className = "status error";
     pill.textContent = "No connection to the room; retrying…";
   });
-  source.addEventListener("message", (e) => renderMessage(JSON.parse(e.data), { highlight: true }));
+  source.addEventListener("message", (e) => renderMessage(JSON.parse(e.data), { highlight: true, alert: true }));
   source.addEventListener("state", (e) => renderState(JSON.parse(e.data)));
   source.addEventListener("wake", (e) => {
     const w = JSON.parse(e.data);
@@ -320,6 +346,8 @@ $("text").addEventListener("keydown", (e) => {
   }
 });
 $("reply-cancel").addEventListener("click", () => setReply(null));
+$("alerts").addEventListener("click", () => enableAlerts().catch((e) => notify(`Could not enable notifications: ${e.message}`)));
+renderAlerts();
 $("pause").addEventListener("click", async () => {
   try {
     renderState(await api("/api/pause", { method: "POST", body: JSON.stringify({ paused: !state.paused }) }));
