@@ -321,6 +321,36 @@ def test_moderator_resets_hops_and_the_brake_still_applies_between_agents():
     assert m2.notified == ("aegis",)
 
 
+def test_moderator_turn_limit_waits_for_the_user():
+    participants = [
+        Participant("user", "User", "human"),
+        Participant("moderator", "Moderator", "agent", "watch", role="moderator"),
+        Participant("aegis", "AEGIS", "agent", "codex_queue"),
+    ]
+    wakers = {p.id: FakeWaker() for p in participants if p.type == "agent"}
+    room = Room(participants, SqliteStore(":memory:"), wakers=wakers, max_moderator_turns=2, clock=Clock())
+    room.send("user", "start")
+    m1 = room.send("moderator", "@aegis one")
+    a1 = room.send("aegis", "@moderator done")
+    m2 = room.send("moderator", "@aegis two")
+    a2 = room.send("aegis", "@moderator done again")
+    assert [m.message.turns for m in (m1, a1, m2, a2)] == [1, 1, 2, 2]
+    assert a2.notified == ("moderator",)
+    m3 = room.send("moderator", "@aegis three")  # turn 3: over the limit, does not wake
+    assert m3.message.turns == 3 and m3.notified == ()
+    assert room.state()["turn_limit_reached"] is True
+    calls = len(wakers["aegis"].calls)
+    room.mark_read("aegis", [m1.message.id, m2.message.id])  # the agent acts: the rewake also respects the limit
+    assert len(wakers["aegis"].calls) == calls
+    room.wake_now("aegis")  # manual wake ignores the limit
+    assert wakers["aegis"].calls[-1][1] == [m3.message.id]
+    room.mark_read("aegis", [m3.message.id])
+    u = room.send("user", "@moderator go on")
+    m4 = room.send("moderator", "@aegis four")
+    assert (u.message.turns, m4.message.turns, m4.notified) == (0, 1, ("aegis",))
+    assert room.state()["turn_limit_reached"] is False
+
+
 def test_user_message_without_mentions_goes_to_the_moderator():
     participants = [
         Participant("user", "User", "human"),

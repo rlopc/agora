@@ -47,6 +47,7 @@ def fetch_pending(
             d["reply_to"],
             d["hops"],
             datetime.fromisoformat(d["created"]),
+            d["turns"],
         )
         for d in data
     ]

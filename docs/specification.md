@@ -77,7 +77,9 @@ A message from the user without mentions goes to the participants with the moder
 
 The hop count restarts at zero when the user or a moderator writes; any other agent adds one to the count of the last message. When a message reaches `max_hops` (3 by default), or wakes are paused, it is stored but wakes nobody: the room waits for the user.
 
-The pause persists across restarts, and resuming does not wake retroactively. A manual wake (button in the UI or `POST /api/wake/{participant}`) needs pending messages and ignores both the pause and the hop limit.
+Because the moderator resets the hops, a moderator and its agents could go on forever without the user. So the room also counts the moderator's turns: each message from the moderator adds one, and the user's next message resets the count. A message past `max_moderator_turns` (6 by default) is stored but wakes nobody either.
+
+The pause persists across restarts, and resuming does not wake retroactively. A manual wake (button in the UI or `POST /api/wake/{participant}`) needs pending messages and ignores the pause and both limits.
 
 ### Pending messages, reads and batching
 
@@ -106,6 +108,7 @@ host = "127.0.0.1"       # local address only
 port = 8765
 db = "data/agora.db"     # SQLite database, excluded from Git
 max_hops = 3
+max_moderator_turns = 6   # moderator messages since the user's last one
 # project = "/path/to/agora"   # uv project that hooks and the MCP run; defaults to this checkout
 
 [tools.claude]
@@ -214,7 +217,7 @@ The UI is served at `/`. It shows the thread, lets you reply to a message, pause
 | `POST /api/messages` | Send a message (as the user, unless `author` is given). |
 | `GET /api/pending` | A participant's pending messages; `wait` long-polls (up to 30 s per request) and `watching` marks the participant as listening meanwhile. |
 | `POST /api/read` | Mark messages as read. |
-| `GET /api/state` | Pause, hops, and each participant's pending count, last wake and error. |
+| `GET /api/state` | Pause, hops, moderator turns, and each participant's pending count, last wake and error. |
 | `POST /api/pause` | Pause or resume wakes. |
 | `POST /api/wake/{participant}` | Manual wake. |
 | `GET /api/events` | Server-sent events (`message`, `wake`, `state`). |
@@ -258,7 +261,7 @@ uv run ruff check    # lint (ruff format formats)
 | Start from scratch | Stop the room and delete its database (`data/agora.db` by default). |
 | `room not available` in the MCP or a hook | Start the room (`uv run agora`, or `agora-start`). |
 | The port is already in use | Another room is running at that address: stop it or choose another port. |
-| An agent does not wake | Check the pause, `max_hops`, batching and the error in the UI; see [Wakers](#wakers) for what each tool needs. |
+| An agent does not wake | Check the pause, `max_hops`, `max_moderator_turns`, batching and the error in the UI; see [Wakers](#wakers) for what each tool needs. |
 | Claude Code does not wake | Answer the first-run dialogs in its window (trust the folder, use the `agora` MCP), or open an interactive session in the agent's exact folder; do not open a second Claude Code session there. Then wake it again from the UI. |
 | Codex does not wake | Check its `CODEX_HOME` and folder, and that a main session exists (`agora-launch` creates one). |
 | Antigravity does not react | Expected until it calls the model: write to it in its window. |

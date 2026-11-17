@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS messages (
     mentions TEXT NOT NULL,
     reply_to INTEGER REFERENCES messages(id),
     hops INTEGER NOT NULL,
-    created TEXT NOT NULL
+    created TEXT NOT NULL,
+    turns INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS mentions (
     message_id INTEGER NOT NULL REFERENCES messages(id),
@@ -60,6 +61,7 @@ def _message(row: sqlite3.Row) -> Message:
         reply_to=row["reply_to"],
         hops=row["hops"],
         created=datetime.fromisoformat(row["created"]),
+        turns=row["turns"],
     )
 
 
@@ -76,6 +78,9 @@ class SqliteStore:
         self._db.execute("PRAGMA busy_timeout=5000")
         self._db.execute("PRAGMA foreign_keys=ON")
         self._db.executescript(_SCHEMA)
+        # Databases created before the moderator turn limit lack the column.
+        if "turns" not in {r["name"] for r in self._db.execute("PRAGMA table_info(messages)")}:
+            self._db.execute("ALTER TABLE messages ADD COLUMN turns INTEGER NOT NULL DEFAULT 0")
 
     def close(self) -> None:
         with self._lock:
@@ -93,13 +98,14 @@ class SqliteStore:
         reply_to: int | None,
         hops: int,
         created: datetime,
+        turns: int = 0,
     ) -> Message:
         with self._lock:
             self._db.execute("BEGIN")
             try:
                 cursor = self._db.execute(
-                    "INSERT INTO messages (author, text, mentions, reply_to, hops, created) VALUES (?, ?, ?, ?, ?, ?)",
-                    (author, text, json.dumps(list(mentions)), reply_to, hops, created.isoformat()),
+                    "INSERT INTO messages (author, text, mentions, reply_to, hops, created, turns) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (author, text, json.dumps(list(mentions)), reply_to, hops, created.isoformat(), turns),
                 )
                 id = cursor.lastrowid
                 assert id is not None  # noqa: S101 - narrows the type; always set after an INSERT
@@ -111,7 +117,7 @@ class SqliteStore:
             except BaseException:
                 self._db.execute("ROLLBACK")
                 raise
-        return Message(id, author, text, tuple(mentions), reply_to, hops, created)
+        return Message(id, author, text, tuple(mentions), reply_to, hops, created, turns)
 
     def get_message(self, id: int) -> Message | None:
         rows = self._rows("SELECT * FROM messages WHERE id = ?", (id,))

@@ -1,3 +1,4 @@
+import sqlite3
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 
@@ -16,8 +17,9 @@ def check_store(factory: Callable[[], Store]) -> None:
 
     m1 = s.add_message("user", "hello @claude", ["claude"], None, 0, _T0)
     m2 = s.add_message("claude", "@codex @user look", ["codex", "user"], 1, 1, _T0 + timedelta(seconds=1))
-    m3 = s.add_message("codex", "no mentions", [], None, 2, _T0 + timedelta(seconds=2))
+    m3 = s.add_message("codex", "no mentions", [], None, 2, _T0 + timedelta(seconds=2), turns=1)
     assert (m1.id, m2.id, m3.id) == (1, 2, 3)
+    assert (m1.turns, m3.turns) == (0, 1) and s.get_message(3) == m3
     assert m2.mentions == ("codex", "user") and m2.reply_to == 1 and m2.hops == 1
     assert s.get_message(2) == m2
     assert s.get_message(99) is None
@@ -60,6 +62,24 @@ def test_contract_in_memory():
 def test_contract_in_file(tmp_path):
     paths = iter(tmp_path / f"agora{i}.db" for i in range(10))
     check_store(lambda: SqliteStore(next(paths)))
+
+
+def test_adds_the_turns_column_to_an_older_database(tmp_path):
+    path = tmp_path / "agora.db"
+    old = sqlite3.connect(path)
+    old.execute(
+        "CREATE TABLE messages (id INTEGER PRIMARY KEY AUTOINCREMENT, author TEXT NOT NULL, text TEXT NOT NULL,"
+        " mentions TEXT NOT NULL, reply_to INTEGER, hops INTEGER NOT NULL, created TEXT NOT NULL)"
+    )
+    old.execute(
+        "INSERT INTO messages (author, text, mentions, hops, created) VALUES ('user', 'hi', '[]', 0, ?)",
+        (_T0.isoformat(),),
+    )
+    old.commit()
+    old.close()
+    store = SqliteStore(path)
+    assert store.last_message().turns == 0
+    assert store.add_message("moderator", "next", [], None, 0, _T0, turns=1).turns == 1
 
 
 def test_persists_across_openings(tmp_path):

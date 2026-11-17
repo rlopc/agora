@@ -19,7 +19,7 @@ from fastapi import FastAPI
 from agora.agents import ConfigError, ResolvedAgent, ResolvedParticipant, resolve, to_participant
 from agora.agents.tool import Tool, UnconfiguredWaker, WakeContext
 from agora.agents.watch import WatchWaker
-from agora.core import MAX_HOPS, Room, RoomError, Waker
+from agora.core import MAX_HOPS, MAX_MODERATOR_TURNS, Room, RoomError, Waker
 from agora.store.sqlite import SqliteStore
 from agora.tools import TOOLS
 from agora.web import WebChannel, create_app
@@ -103,6 +103,7 @@ def build(
             [channel],
             wakers,
             max_hops=int(settings.get("max_hops", MAX_HOPS)),
+            max_moderator_turns=int(settings.get("max_moderator_turns", MAX_MODERATOR_TURNS)),
             executor=executor,
         )
     except RoomError:
