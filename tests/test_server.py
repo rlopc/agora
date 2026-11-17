@@ -124,7 +124,8 @@ def test_pending_for_hooks(server):
     httpx.post(f"{url}/api/messages", json={"text": "@claude review"})
     full = subprocess.run(pending, capture_output=True, text=True, encoding="utf-8")
     assert full.stdout.splitlines() == [
-        "[agora] 1 pending message(s) for @claude (handle them with the `agora` MCP):",
+        "[agora] 1 pending message(s) for @claude. Answer in the room with the `send` tool of the `agora` MCP "
+        "(set `reply_to`), not in this chat; use `mark_read` for what needs no reply:",
         "#1 user→claude: @claude review",
     ]
 
