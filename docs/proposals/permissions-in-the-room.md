@@ -28,10 +28,11 @@ Sources: [Claude Code hooks](https://code.claude.com/docs/en/hooks), [Codex hook
 
 1. **Hook.** `agora-prepare` adds a `PermissionRequest` hook (Claude Code and Codex) that runs a new command, `agora-permission --participant ID`. It reads the request from stdin and posts it to the room.
 2. **Room.** A new `permission` record (agent, tool, input, description, created, decision, decided). The UI shows pending requests at the top, with «Allow» and «Deny»; a server-sent event announces each one.
-3. **Waiting.** `agora-permission` long-polls the room until there is a decision or its own deadline (for example, 5 minutes, below the hook timeout). With a decision it prints the tool's JSON; without one it prints nothing, so the tool shows its usual prompt in the terminal.
+3. **Waiting.** Claude Code shows its usual prompt in the terminal while the hook runs, so the room and the terminal race and the first answer wins. `agora-permission` long-polls the room until there is a decision, and the hook keeps the default timeout (600 seconds): a short deadline is not needed. With a decision it prints the tool's JSON.
 4. **Room down.** If the room is not reachable, the command prints nothing at once: the tool asks as today.
-5. **Codex.** Today `approval_policy = "never"`, so Codex never asks and the hook would never fire. Using this feature means switching to an approval policy that asks (`on-request`), which changes Codex from "fail outside the sandbox" to "ask the room".
-6. **Antigravity.** Not in the first version: its `PreToolUse` hook fires on every call, so the room would have to ask for all of them or copy `agy`'s permission rules.
+5. **Answered elsewhere.** When the user answers in the terminal or the hook times out, the tool kills `agora-permission`, and the request would stay pending in the room. The command must mark it as answered in the terminal before it exits, or the room must expire it.
+6. **Codex.** Today `approval_policy = "never"`, so Codex never asks and the hook would never fire. Using this feature means switching to an approval policy that asks (`on-request`), which changes Codex from "fail outside the sandbox" to "ask the room".
+7. **Antigravity.** Not in the first version: its `PreToolUse` hook fires on every call, so the room would have to ask for all of them or copy `agy`'s permission rules.
 
 ## Security
 
@@ -42,12 +43,25 @@ The API has no authentication, so an agent could approve its own request with an
 
 This stops an agent from approving by mistake or through a prompt injection. It does not stop a process that runs as the same user and goes looking for the token (for example, by reading the room's tmux window); that limit should be documented.
 
-## To verify before implementing
+## Verified
 
-- Claude Code: whether, while the hook is waiting, the terminal shows the prompt as well, or only after the hook returns without a decision.
-- Claude Code: that printing nothing (exit 0, no output) falls back to the normal prompt. The documentation only says so for exit code 2.
-- Codex: that `PermissionRequest` fires with the agent's approval policy, and how the sandbox and approval settings change once it is no longer `never`.
-- What each tool does when the hook times out.
+Claude Code 2.1.311, `default` permission mode, a `Bash` call, with a probe hook that logs its input and waits (2026-11-17):
+
+| Case | Result |
+| --- | --- |
+| Hook waiting | The terminal shows the prompt at the same time; it does not wait for the hook. |
+| Hook exits 0 with no output | The normal prompt stays; the user answers it. |
+| Hook prints `allow` while the prompt is open | The hook wins: the prompt closes and the call runs ("Allowed by PermissionRequest hook"). |
+| User answers in the terminal first | The hook process is killed before it finishes. |
+| Hook times out | The hook process is killed, the prompt stays open and a later decision is ignored. |
+
+The hook's input includes `session_id`, `cwd`, `permission_mode`, `tool_name`, `tool_input` (for `Bash`, `command` and `description`) and `permission_suggestions`.
+
+Still to verify:
+
+- Claude Code: which signal kills the hook, so `agora-permission` can mark the request before it exits.
+- Claude Code: `deny` with a `message`, and tools other than `Bash` (only documented).
+- Codex: that `PermissionRequest` fires with the agent's approval policy, how the sandbox and approval settings change once it is no longer `never`, whether its prompt also races with the hook, and what it does when the hook times out.
 
 ## Cost
 
