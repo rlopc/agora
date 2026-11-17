@@ -205,7 +205,7 @@ Each agent signs in with its own tool:
 
 ## Web API and MCP
 
-The UI is served at `/`. It shows the thread, lets you reply to a message, pause and resume wakes, see who is listening and wake an agent manually after a failed wake.
+The UI is served at `/`. It shows the thread, lets you reply to a message, pause and resume wakes, see who is listening and wake an agent manually after a failed wake. After you allow notifications (button shown until the browser has asked), a message that mentions you raises a browser notification while the page is hidden or out of focus; clicking it brings the page to that message.
 
 | Endpoint | Purpose |
 | --- | --- |
