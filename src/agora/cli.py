@@ -12,7 +12,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
 
-from agora.agents.config import ConfigError
+from agora.agents.config import ConfigError, ResolvedAgent
 from agora.agents.environment import db_path, environment_for, room_running, wait_for_room
 from agora.agents.prepare import agents, load, pending_changes, prepare
 from agora.agents.terminal import open_window
@@ -106,6 +106,19 @@ def main_start(argv: Sequence[str] | None = None) -> None:
     for p in found:
         open_window(p.id, [*uv, "agora-launch", "--config", str(path), p.id], p.folder)
     print(f"Room at {environment.url}; agents: {', '.join(p.id for p in found)}. Open them with: tmux attach -t agora")
+    print(first_run_notice(found))
+
+
+def first_run_notice(found: Sequence[ResolvedAgent]) -> str:
+    """What each tool asks the first time in a folder, grouped by tool."""
+    by_tool: dict[str, list[str]] = {}
+    for p in found:
+        by_tool.setdefault(p.tool, []).append(p.id)
+    lines = [
+        "The first time in a folder, answer in each agent's window before writing in the room, or it cannot be woken:"
+    ]
+    lines += [f"- {tool} ({', '.join(ids)}): {TOOLS[tool].first_run}." for tool, ids in by_tool.items()]
+    return "\n".join(lines)
 
 
 def main_archive(argv: Sequence[str] | None = None) -> None:

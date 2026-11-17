@@ -19,6 +19,10 @@ class Claude:
     default_waker = "concierge"
     own_keys = frozenset()
     loads_parent_instructions = True  # the CLAUDE.md files of parent folders
+    first_run = (
+        "trust the folder («Yes, I trust this folder») and use the `agora` MCP server («Use this MCP server»); "
+        "in both, the default option declines"
+    )
 
     def resolve(self, data: Mapping[str, Any], defaults: Mapping[str, Any], base: Path) -> None:
         return None

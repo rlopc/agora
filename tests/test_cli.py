@@ -45,7 +45,7 @@ def test_launch_claude_without_claude_variables():
     assert launch.cwd == BASE and launch.env == {"PATH": "x"}
 
 
-def test_start_opens_room_and_agents_in_order(monkeypatch, tmp_path):
+def test_start_opens_room_and_agents_in_order(monkeypatch, tmp_path, capsys):
     for folder in ("aegis", "vista"):
         (tmp_path / folder).mkdir()
     path = tmp_path / "agora.toml"
@@ -66,6 +66,9 @@ def test_start_opens_room_and_agents_in_order(monkeypatch, tmp_path):
     assert opened[0][1][-3:] == ["agora", "--config", str(path)]
     assert opened[2][1][-4:] == ["agora-launch", "--config", str(path), "aegis"]
     assert (tmp_path / "homes" / "aegis" / "config.toml").is_file()  # prepared before opening
+    out = capsys.readouterr().out
+    assert "- claude (moderator): trust the folder" in out
+    assert "- codex (aegis, vista): trust the hooks" in out
 
 
 def test_start_does_not_open_agents_if_the_room_does_not_answer(monkeypatch, tmp_path):
