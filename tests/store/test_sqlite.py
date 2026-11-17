@@ -64,7 +64,7 @@ def test_contract_in_file(tmp_path):
     check_store(lambda: SqliteStore(next(paths)))
 
 
-def test_adds_the_turns_column_to_an_older_database(tmp_path):
+def test_adds_the_new_columns_to_an_older_database(tmp_path):
     path = tmp_path / "agora.db"
     old = sqlite3.connect(path)
     old.execute(
@@ -80,6 +80,8 @@ def test_adds_the_turns_column_to_an_older_database(tmp_path):
     store = SqliteStore(path)
     assert store.last_message().turns == 0
     assert store.add_message("moderator", "next", [], None, 0, _T0, turns=1).turns == 1
+    assert store.last_message().round is None
+    assert store.add_message("claude", "answer", [], None, 0, _T0, round=1).round == 1
 
 
 def test_persists_across_openings(tmp_path):
@@ -111,3 +113,24 @@ def test_archive_copies_the_database_and_deletes_it(tmp_path):
 def test_archive_without_database(tmp_path):
     assert archive(tmp_path / "agora.db", tmp_path / "archive", _T0) is None
     assert not (tmp_path / "archive").exists()
+
+
+def test_open_round_hidden_from_other_viewers():
+    s = SqliteStore(":memory:")
+    s.add_message("user", "@claude @codex ideas?", ["claude", "codex"], None, 0, _T0)
+    round = s.open_round("user", 1, ["claude", "codex"], _T0)
+    assert s.current_round() == round
+    s.add_message("claude", "mine @codex", ["user", "codex"], 1, 0, _T0, round=round.id)
+    assert s.round_authors(round.id) == {"claude"}
+
+    assert [m.id for m in s.messages()] == [1, 2]
+    assert [m.id for m in s.messages(viewer="claude")] == [1, 2]
+    assert [m.id for m in s.messages(viewer="codex")] == [1]
+    assert [m.id for m in s.last_messages(5, viewer="codex")] == [1]
+    assert [m.id for m in s.pending("codex", viewer="codex")] == [1]
+    assert [m.id for m in s.pending("user")] == [2]
+
+    s.close_round(round.id, _T0)
+    assert s.current_round() is None
+    assert [m.id for m in s.messages(viewer="codex")] == [1, 2]
+    assert [m.id for m in s.pending("codex", viewer="codex")] == [1, 2]

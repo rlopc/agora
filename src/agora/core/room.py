@@ -1,4 +1,4 @@
-"""Room rules: mentions, hops, moderator turns, batching of wakes and pause."""
+"""Room rules: mentions, hops, moderator turns, blind rounds, batching of wakes and pause."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from datetime import UTC, datetime
 from typing import Any
 
 from agora.core.mentions import extract_mentions
-from agora.core.model import ROLES, Event, Message, Participant
+from agora.core.model import ROLES, Event, Message, Participant, Round
 from agora.core.ports import Channel, Store, WakeError, Waker
 
 MAX_HOPS = 3
@@ -26,6 +26,7 @@ class SendResult:
     message: Message
     unknown: tuple[str, ...]
     notified: tuple[str, ...]
+    held: tuple[str, ...] = ()  # agent mentions not delivered because the message is part of a blind round
 
 
 def _now() -> datetime:
@@ -87,7 +88,7 @@ class Room:
 
     # Participant operations
 
-    def send(self, author: str, text: str, reply_to: int | None = None) -> SendResult:
+    def send(self, author: str, text: str, reply_to: int | None = None, *, blind: bool = False) -> SendResult:
         participant = self._participant(author)
         text = text.strip()
         if not text:
@@ -100,6 +101,10 @@ class Room:
         if not mentions and participant.type == "human":
             # A message from the user without mentions goes to the moderator, if any; otherwise, to nobody.
             mentions = tuple(p.id for p in self.participants.values() if p.role == "moderator")
+        round = self.store.current_round()
+        round_participants = self._check_opening(participant, mentions, round) if blind else []
+        # Round the message answers: any message by one of its participants while it is open.
+        answering = round if round is not None and author in round.participants else None
         last = self.store.last_message()
         hops = 0 if participant.type == "human" or participant.role == "moderator" else (last.hops if last else 0) + 1
         # The moderator resets the hops, so its own messages since the user's last one are counted apart.
@@ -109,29 +114,45 @@ class Room:
             else (last.turns if last else 0) + (1 if participant.role == "moderator" else 0)
         )
 
+        held: tuple[str, ...] = ()
+        if answering:
+            # The answer goes only to whoever opened the round; another agent would be anchored by it.
+            held = tuple(m for m in mentions if self.participants[m].type == "agent")
+            kept = [m for m in mentions if m not in held] + [answering.author]
+            mentions = tuple(m for m in dict.fromkeys(kept) if m != author)
+            # Answers are replies to the opening message, not a chain between agents.
+            opener = self.store.get_message(answering.opener)
+            hops = opener.hops if opener else 0
+
         now = self._clock()
-        message = self.store.add_message(author, text, mentions, reply_to, hops, now, turns)
+        message = self.store.add_message(
+            author, text, mentions, reply_to, hops, now, turns, answering.id if answering else None
+        )
+        if blind:
+            self.store.open_round(author, message.id, round_participants, now)
         if reply_to is not None:
             self.store.mark_read(author, [reply_to], now)
         if participant.type == "agent":
             self.store.record_activity(author, now)
 
         self._publish("message", message.as_dict())
-        notified = tuple(p for p in mentions if self._should_wake(p, message))
+        notified = () if answering else tuple(p for p in mentions if self._should_wake(p, message))
         for target in notified:
             self._mark_seen(target, message.id)
             self.store.record_wake(target, now, None)
             self._executor(lambda target=target: self._wake(target))
+        if answering and self.store.round_authors(answering.id) >= set(answering.participants):
+            self._close(answering)
         self._publish("state", self.state())
         if participant.type == "agent":
             self._rewake(author)
-        return SendResult(message, unknown, notified)
+        return SendResult(message, unknown, notified, held)
 
     def pending(self, participant: str, since: int = 0, *, activity: bool = False) -> list[Message]:
         self._participant(participant)
         if activity:
             self.store.record_activity(participant, self._clock())
-        result = self.store.pending(participant, since)
+        result = self._pending(participant, since)
         if activity and result:
             self._mark_seen(participant, result[-1].id)
         return result
@@ -169,13 +190,26 @@ class Room:
         end = self._listen_end.get(participant)
         return end is not None and time.monotonic() - end < margin
 
-    def messages(self, since: int = 0, limit: int = 200) -> list[Message]:
-        return self.store.messages(since, limit)
+    def messages(self, since: int = 0, limit: int = 200, viewer: str | None = None) -> list[Message]:
+        """`viewer` None, or the user, sees everything; an agent does not see the others' answers in an open round."""
+        return self.store.messages(since, limit, self._viewer(viewer))
 
-    def history(self, since: int | None = None, limit: int = 20) -> list[Message]:
+    def history(self, since: int | None = None, limit: int = 20, viewer: str | None = None) -> list[Message]:
         if since is None:
-            return self.store.last_messages(limit)
-        return self.store.messages(since, limit)
+            return self.store.last_messages(limit, self._viewer(viewer))
+        return self.store.messages(since, limit, self._viewer(viewer))
+
+    def close_round(self, by: str) -> Round:
+        """Closes the open blind round before everyone has answered (someone does not answer)."""
+        participant = self._participant(by)
+        round = self.store.current_round()
+        if round is None:
+            raise RoomError("there is no open blind round")
+        if participant.type != "human" and participant.role != "moderator":
+            raise RoomError("only the user or the moderator can close a blind round")
+        self._close(round)
+        self._publish("state", self.state())
+        return round
 
     # Room control (user)
 
@@ -188,7 +222,7 @@ class Room:
         p = self._participant(participant)
         if participant not in self.wakers:
             raise RoomError(f"@{p.id} has no waker")
-        if not self.store.pending(participant):
+        if not self._pending(participant):
             raise RoomError(f"@{p.id} has no pending messages")
         self.store.record_wake(participant, self._clock(), None)
         self._executor(lambda: self._wake(participant))
@@ -197,11 +231,12 @@ class Room:
         last = self.store.last_message()
         hops = last.hops if last else 0
         turns = last.turns if last else 0
+        round = self.store.current_round()
         participants = {}
         for p in self.participants.values():
             wake = self.store.wake_state(p.id)
             participants[p.id] = {
-                "pending": len(self.store.pending(p.id)),
+                "pending": len(self._pending(p.id)),
                 "last_wake": wake.last_wake.isoformat() if wake.last_wake else None,
                 "error": wake.error,
                 "listening": self.listening(p.id),
@@ -214,6 +249,7 @@ class Room:
             "max_moderator_turns": self.max_moderator_turns,
             "moderator_turns": turns,
             "turn_limit_reached": turns > self.max_moderator_turns,
+            "round": self._round_state(round) if round else None,
             "participants": participants,
         }
 
@@ -224,6 +260,50 @@ class Room:
             return self.participants[id]
         except KeyError:
             raise RoomError(f"unknown participant: {id}") from None
+
+    def _viewer(self, id: str | None) -> str | None:
+        if id is None:
+            return None
+        return None if self._participant(id).type == "human" else id
+
+    def _pending(self, target: str, since: int = 0) -> list[Message]:
+        return self.store.pending(target, since, self._viewer(target))
+
+    def _check_opening(self, participant: Participant, mentions: Sequence[str], round: Round | None) -> list[str]:
+        """Participants of the blind round that the message opens."""
+        if participant.type != "human" and participant.role != "moderator":
+            raise RoomError("only the user or the moderator can open a blind round")
+        if round is not None:
+            raise RoomError(f"blind round #{round.id} is still open")
+        agents = [m for m in mentions if self.participants[m].type == "agent"]
+        if len(agents) < 2:
+            raise RoomError("a blind round needs at least two mentioned agents")
+        return agents
+
+    def _round_state(self, round: Round) -> dict[str, Any]:
+        answered = self.store.round_authors(round.id)
+        return {
+            "id": round.id,
+            "opener": round.opener,
+            "author": round.author,
+            "participants": list(round.participants),
+            "answered": [p for p in round.participants if p in answered],
+            "waiting": [p for p in round.participants if p not in answered],
+        }
+
+    def _close(self, round: Round) -> None:
+        """Reveals the answers and wakes whoever opened the round once, with all of them."""
+        self.store.close_round(round.id, self._clock())
+        self._publish("round", {"id": round.id, "author": round.author, "participants": list(round.participants)})
+        target = round.author
+        if self.participants[target].type != "agent" or target not in self.wakers or self.store.paused():
+            return
+        last = self.store.last_message()
+        if last is not None and self._over_limit(last):
+            return
+        # Direct wake, as `wake_now`: the answers may be older than the last restart, which counts them as seen.
+        self.store.record_wake(target, self._clock(), None)
+        self._executor(lambda: self._wake(target))
 
     def _should_wake(self, target: str, message: Message) -> bool:
         participant = self.participants[target]
@@ -246,7 +326,7 @@ class Room:
         waker = self.wakers[target]
         error: str | None = None
         for attempt in range(2):
-            pending = self.store.pending(target)
+            pending = self._pending(target)
             if not pending:
                 return
             self._mark_seen(target, pending[-1].id)
@@ -276,7 +356,7 @@ class Room:
             return
         with self._seen_lock:
             seen = self._seen.get(target, self._initial_seen)
-            new = [m.id for m in self.store.pending(target, seen) if not self._over_limit(m)]
+            new = [m.id for m in self._pending(target, seen) if not self._over_limit(m)]
             if not new:
                 return
             self._seen[target] = new[-1]

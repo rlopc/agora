@@ -174,3 +174,19 @@ def test_sse_channel_broadcasts_events():
         assert channel._subscribers == set()
 
     asyncio.run(scenario())
+
+
+def test_blind_round(setup):
+    client, _, _ = setup
+    r = client.post("/api/messages", json={"text": "@claude @codex which database?", "blind": True})
+    assert r.status_code == 200
+    held = client.post("/api/messages", json={"author": "codex", "text": "SQLite, @claude?", "reply_to": 1}).json()
+    assert held["held"] == ["claude"]
+    assert [m["id"] for m in client.get("/api/history", params={"participant": "claude"}).json()] == [1]
+    assert [m["id"] for m in client.get("/api/messages", params={"participant": "claude"}).json()] == [1]
+    assert [m["id"] for m in client.get("/api/history").json()] == [1, 2]
+    assert client.get("/api/state").json()["round"]["waiting"] == ["claude"]
+    assert client.post("/api/round/close", json={"participant": "codex"}).status_code == 400
+    assert client.post("/api/round/close").json()["round"] is None
+    assert client.post("/api/round/close").status_code == 400
+    assert client.get("/api/history", params={"participant": "nobody"}).status_code == 400

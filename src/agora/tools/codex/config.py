@@ -16,7 +16,7 @@ from agora.agents.notes import note
 from agora.paths import same_path
 
 SUBAGENT = "subagent"
-ROOM_TOOLS = ("pending", "send", "mark_read", "history")
+ROOM_TOOLS = ("pending", "send", "mark_read", "history", "close_round")
 EVENTS = ("SessionStart", "UserPromptSubmit")
 
 

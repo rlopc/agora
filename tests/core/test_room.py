@@ -382,3 +382,105 @@ def test_without_moderator_a_message_without_mentions_wakes_nobody():
 def test_invalid_role_is_rejected(participant):
     with pytest.raises(RoomError, match="role"):
         Room([Participant("user", "User", "human"), participant], SqliteStore(":memory:"))
+
+
+# Blind rounds
+
+ROUND_PARTICIPANTS = [
+    Participant("user", "User", "human"),
+    Participant("moderator", "Moderator", "agent", "watch", role="moderator"),
+    Participant("proponent", "Proponent", "agent", "watch"),
+    Participant("critic", "Critic", "agent", "watch"),
+]
+
+
+@pytest.fixture
+def debate():
+    wakers = {p.id: FakeWaker() for p in ROUND_PARTICIPANTS if p.type == "agent"}
+    store = SqliteStore(":memory:")
+    room = Room(ROUND_PARTICIPANTS, store, [], wakers, clock=Clock())
+    return room, wakers, store
+
+
+def test_only_the_user_or_the_moderator_opens_a_round_with_two_agents(debate):
+    room, _, _ = debate
+    with pytest.raises(RoomError, match="only the user or the moderator"):
+        room.send("proponent", "@critic @moderator thoughts?", blind=True)
+    with pytest.raises(RoomError, match="at least two"):
+        room.send("user", "@critic thoughts?", blind=True)
+    room.send("user", "@proponent @critic thoughts?", blind=True)
+    with pytest.raises(RoomError, match="still open"):
+        room.send("moderator", "@proponent @critic again?", blind=True)
+
+
+def test_answers_are_hidden_from_the_other_agents_until_everyone_replies(debate):
+    room, wakers, _ = debate
+    opening = room.send("user", "@proponent @critic which database?", blind=True)
+    assert opening.notified == ("proponent", "critic")
+
+    answer = room.send("proponent", "SQLite; @critic will say Postgres", reply_to=1)
+    # Only the user (who opened it) is mentioned; the critic's mention is held and nobody is woken.
+    assert answer.message.mentions == ("user",)
+    assert answer.held == ("critic",)
+    assert answer.notified == ()
+    assert answer.message.hops == 0
+    assert [m.id for m in room.pending("critic")] == [1]
+    assert [m.id for m in room.history(viewer="critic")] == [1]
+    assert [m.id for m in room.history(viewer="proponent")] == [1, 2]
+    assert [m.id for m in room.history()] == [1, 2]
+    assert room.state()["round"]["waiting"] == ["critic"]
+
+    room.send("critic", "Postgres", reply_to=1)
+    assert room.state()["round"] is None
+    assert [m.id for m in room.history(viewer="critic")] == [1, 2, 3]
+    assert room.pending("critic") == []  # the held mention is not delivered after the close either
+    assert wakers["critic"].calls == [("critic", [1])]
+
+
+def test_the_moderator_is_woken_once_with_all_the_answers(debate):
+    room, wakers, _ = debate
+    room.send("user", "@moderator compare both options")
+    room.send("moderator", "@proponent @critic your position?", reply_to=1, blind=True)
+    room.send("proponent", "A", reply_to=2)
+    assert room.pending("moderator") == []
+    assert wakers["moderator"].calls == [("moderator", [1])]
+
+    room.send("critic", "B", reply_to=2)
+    assert wakers["moderator"].calls == [("moderator", [1]), ("moderator", [3, 4])]
+
+
+def test_the_user_closes_a_round_that_someone_does_not_answer(debate):
+    room, wakers, _ = debate
+    room.send("moderator", "@proponent @critic your position?", blind=True)
+    room.send("proponent", "A", reply_to=1)
+    with pytest.raises(RoomError, match="only the user or the moderator"):
+        room.close_round("proponent")
+    room.close_round("user")
+    assert wakers["moderator"].calls == [("moderator", [2])]
+    with pytest.raises(RoomError, match="no open blind round"):
+        room.close_round("user")
+
+    late = room.send("critic", "B, sorry @proponent", reply_to=1)
+    assert late.message.round is None
+    assert late.notified == ("proponent",)
+
+
+def test_a_round_survives_a_restart(debate):
+    room, wakers, store = debate
+    room.send("moderator", "@proponent @critic your position?", blind=True)
+    room.send("proponent", "A", reply_to=1)
+
+    restarted = Room(ROUND_PARTICIPANTS, store, [], wakers, clock=Clock())
+    assert restarted.state()["round"]["waiting"] == ["critic"]
+    restarted.send("critic", "B", reply_to=1)
+    assert wakers["moderator"].calls == [("moderator", [2, 3])]
+
+
+def test_closing_while_paused_wakes_nobody(debate):
+    room, wakers, _ = debate
+    room.send("moderator", "@proponent @critic your position?", blind=True)
+    room.set_paused(True)
+    room.send("proponent", "A", reply_to=1)
+    room.send("critic", "B", reply_to=1)
+    assert wakers["moderator"].calls == []
+    assert [m.id for m in room.pending("moderator")] == [2, 3]

@@ -31,6 +31,7 @@ class Message:
     hops: int
     created: datetime
     turns: int = 0
+    round: int | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -42,7 +43,20 @@ class Message:
             "hops": self.hops,
             "created": self.created.isoformat(),
             "turns": self.turns,
+            "round": self.round,
         }
+
+
+@dataclass(frozen=True)
+class Round:
+    """Blind round: its participants' messages are hidden from the other agents until it closes."""
+
+    id: int
+    opener: int
+    author: str
+    participants: tuple[str, ...]
+    opened: datetime
+    closed: datetime | None = None
 
 
 @dataclass(frozen=True)

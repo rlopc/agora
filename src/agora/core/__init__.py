@@ -1,7 +1,7 @@
 """Core of the agent room: model, rules and ports, with no external dependencies."""
 
 from agora.core.mentions import extract_mentions
-from agora.core.model import Event, Message, Participant, ParticipantType, WakeState, format_line
+from agora.core.model import Event, Message, Participant, ParticipantType, Round, WakeState, format_line
 from agora.core.ports import Channel, Store, WakeError, Waker
 from agora.core.room import MAX_HOPS, MAX_MODERATOR_TURNS, Room, RoomError, SendResult
 
@@ -15,6 +15,7 @@ __all__ = [
     "ParticipantType",
     "Room",
     "RoomError",
+    "Round",
     "SendResult",
     "Store",
     "WakeError",

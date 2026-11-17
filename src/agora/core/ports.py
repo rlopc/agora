@@ -6,7 +6,7 @@ from collections.abc import Iterable, Sequence
 from datetime import datetime
 from typing import Protocol
 
-from agora.core.model import Event, Message, Participant, WakeState
+from agora.core.model import Event, Message, Participant, Round, WakeState
 
 
 class Store(Protocol):
@@ -19,22 +19,37 @@ class Store(Protocol):
         hops: int,
         created: datetime,
         turns: int = 0,
+        round: int | None = None,
     ) -> Message: ...
 
     def get_message(self, id: int) -> Message | None: ...
 
     def last_message(self) -> Message | None: ...
 
-    def messages(self, since: int = 0, limit: int = 200) -> list[Message]:
+    # `viewer`: an agent sees the messages of an open round only if it wrote them; None sees everything.
+
+    def messages(self, since: int = 0, limit: int = 200, viewer: str | None = None) -> list[Message]:
         """Messages with id > since, in ascending order."""
         ...
 
-    def last_messages(self, limit: int) -> list[Message]:
+    def last_messages(self, limit: int, viewer: str | None = None) -> list[Message]:
         """The last `limit` messages, in ascending order."""
         ...
 
-    def pending(self, participant: str, since: int = 0) -> list[Message]:
+    def pending(self, participant: str, since: int = 0, viewer: str | None = None) -> list[Message]:
         """Messages that mention `participant`, by another author, not read by them and with id > since."""
+        ...
+
+    def open_round(self, author: str, opener: int, participants: Sequence[str], when: datetime) -> Round: ...
+
+    def current_round(self) -> Round | None:
+        """The open round, if any."""
+        ...
+
+    def close_round(self, id: int, when: datetime) -> None: ...
+
+    def round_authors(self, id: int) -> set[str]:
+        """Participants who have written in the round."""
         ...
 
     def mark_read(self, participant: str, ids: Iterable[int], when: datetime) -> None: ...

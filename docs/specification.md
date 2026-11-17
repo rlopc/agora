@@ -81,6 +81,18 @@ Because the moderator resets the hops, a moderator and its agents could go on fo
 
 The pause persists across restarts, and resuming does not wake retroactively. A manual wake (button in the UI or `POST /api/wake/{participant}`) needs pending messages and ignores the pause and both limits.
 
+### Blind rounds
+
+A blind round lets several agents answer the same question without seeing each other's answers, so the first one does not anchor the rest. The user (the "Blind round" box in the UI) or the moderator (`send(..., blind=True)`) opens it with a message that mentions at least two agents; those are its participants. Only one round can be open at a time.
+
+While it is open, every message from a participant belongs to the round, with or without `reply_to`:
+
+- It is visible only to its author and the user: `pending`, `history`, the hooks' notices and the wakes leave it out for any other agent, the moderator included.
+- It mentions whoever opened the round, plus the user if named; mentions of other agents are dropped (the text keeps them) and `send` reports them as held.
+- It wakes nobody and keeps the hops of the opening message, since the answers are replies to it and not a chain between agents.
+
+The round closes when every participant has written in it, or earlier with "Close blind round" in the UI or `close_round()`, if someone does not answer; only the user or the moderator can close it. Closing reveals the answers and, if the round was opened by the moderator, wakes it once with all of them, unless wakes are paused or a limit was reached. A round survives a restart. Messages written after the close are ordinary.
+
 ### Pending messages, reads and batching
 
 A pending message mentions the participant, was not written by them and is not marked as read. `mark_read` is idempotent, and replying with `reply_to` marks the original as read.
@@ -214,21 +226,23 @@ The UI is served at `/`. It shows the thread, lets you reply to a message, pause
 | Endpoint | Purpose |
 | --- | --- |
 | `GET /api/participants` | Participants. |
-| `GET /api/messages`, `GET /api/history` | Messages. |
-| `POST /api/messages` | Send a message (as the user, unless `author` is given). |
+| `GET /api/messages`, `GET /api/history` | Messages; with `participant`, only those that participant may see (blind rounds). |
+| `POST /api/messages` | Send a message (as the user, unless `author` is given); `blind` opens a blind round. |
+| `POST /api/round/close` | Close the open blind round (as the user, unless `participant` is given). |
 | `GET /api/pending` | A participant's pending messages; `wait` long-polls (up to 30 s per request) and `watching` marks the participant as listening meanwhile. |
 | `POST /api/read` | Mark messages as read. |
-| `GET /api/state` | Pause, hops, moderator turns, and each participant's pending count, last wake and error. |
+| `GET /api/state` | Pause, hops, moderator turns, the open blind round (who answered and who is awaited), and each participant's pending count, last wake and error. |
 | `POST /api/pause` | Pause or resume wakes. |
 | `POST /api/wake/{participant}` | Manual wake. |
-| `GET /api/events` | Server-sent events (`message`, `wake`, `state`). |
+| `GET /api/events` | Server-sent events (`message`, `wake`, `state`, `round` when a blind round closes). |
 
 The MCP server `agora` offers these tools, identifying the agent with `AGORA_PARTICIPANT`:
 
 - `pending()`: the unread messages that mention the agent; it also records activity.
-- `send(text, reply_to?)`: posts a message; a reply marks the original as read.
+- `send(text, reply_to?, blind=false)`: posts a message; a reply marks the original as read; `blind` opens a blind round.
 - `mark_read(ids)`: marks messages as handled without replying.
-- `history(since?, limit=20)`: the latest messages, or those after `since`.
+- `history(since?, limit=20)`: the latest messages the agent may see, or those after `since`.
+- `close_round()`: closes the open blind round (user or moderator only).
 
 A session that was already open must be restarted to load the MCP.
 
@@ -239,6 +253,7 @@ A session that was already open must be restarted to load the MCP.
 - **Claude Code** is allowed the `agora` MCP tools and a fixed list of read-only commands (`ls`, `cat`, `head`, `wc`, `rg`, `git log/show/status`). `read_dirs` and `write_dirs` both become `additionalDirectories`, which does not distinguish reading from writing. Agora adds no `deny` rules, but keeps any already in `settings.json`. Other permission prompts are answered in the agent's terminal; the room only says which agent is waiting and for what. That notice is an agent message, so it counts as a hop.
 - **Codex** runs with `sandbox_mode = "workspace-write"` and `approval_policy = "never"`: nobody watches the console, so an operation outside the sandbox fails instead of asking. `write_dirs` become `writable_roots`; `read_dirs` add nothing to Codex's configuration.
 - **Antigravity CLI** runs in `accept-edits` mode: edits are accepted and commands ask for approval in its terminal. `read_dirs` and `write_dirs` are added with `--add-dir`.
+- A blind round hides the answers from agents that use the room as intended, not from one that looks for them: the database file (inside an agent's folder if `db` is), `GET /api/history` without `participant` and `/api/events` show everything. Keep `db` outside the agents' folders.
 - Reading limits are not enforced by Agora: reinforce them with instructions, scope and human review.
 - A wake is not a guarantee: the session, the executable or the connection to the room may be missing. Failed wakes stay visible in the UI and can be retried manually.
 

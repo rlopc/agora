@@ -119,6 +119,12 @@ function renderMessage(m, { highlight = false, alert = false } = {}) {
     re.textContent = `re #${m.reply_to}`;
     meta.append(re);
   }
+  if (m.round) {
+    const blind = document.createElement("span");
+    blind.textContent = "blind";
+    blind.title = `Answer in blind round #${m.round}: the other agents see it when the round closes`;
+    meta.append(blind);
+  }
   if (m.hops > 0) {
     const hops = document.createElement("span");
     hops.className = "hops";
@@ -200,6 +206,10 @@ function renderState(s) {
   } else if (s.turn_limit_reached) {
     pill.textContent = `Limit of ${s.max_moderator_turns} moderator turns: waiting for your reply`;
     pill.classList.add("limit");
+  } else if (s.round) {
+    pill.textContent = s.round.waiting.length
+      ? `Blind round: waiting for ${s.round.waiting.map((id) => "@" + id).join(", ")}`
+      : "Blind round: closing…";
   } else if (withError.length) {
     pill.textContent = `Could not wake ${withError.map((p) => "@" + p.id).join(", ")}`;
     pill.classList.add("error");
@@ -208,6 +218,8 @@ function renderState(s) {
   } else {
     pill.textContent = "Up to date";
   }
+
+  $("round-close").hidden = !s.round;
 
   const list = $("participants");
   list.replaceChildren();
@@ -281,9 +293,10 @@ async function send(event) {
   try {
     const r = await api("/api/messages", {
       method: "POST",
-      body: JSON.stringify({ text, reply_to: state.replyTo }),
+      body: JSON.stringify({ text, reply_to: state.replyTo, blind: $("blind").checked }),
     });
     field.value = "";
+    $("blind").checked = false;
     setReply(null);
     renderMessage(r.message);
     if (r.unknown.length) {
@@ -314,6 +327,7 @@ function connect() {
   });
   source.addEventListener("message", (e) => renderMessage(JSON.parse(e.data), { highlight: true, alert: true }));
   source.addEventListener("state", (e) => renderState(JSON.parse(e.data)));
+  source.addEventListener("round", () => notify("Blind round closed: every answer is visible now", "info"));
   source.addEventListener("wake", (e) => {
     const w = JSON.parse(e.data);
     if (!w.ok) notify(`Could not wake @${w.participant}: ${w.error}`);
@@ -351,6 +365,13 @@ $("text").addEventListener("keydown", (e) => {
 $("reply-cancel").addEventListener("click", () => setReply(null));
 $("alerts").addEventListener("click", () => enableAlerts().catch((e) => notify(`Could not enable notifications: ${e.message}`)));
 renderAlerts();
+$("round-close").addEventListener("click", async () => {
+  try {
+    renderState(await api("/api/round/close", { method: "POST" }));
+  } catch (e) {
+    notify(`Could not close the blind round: ${e.message}`);
+  }
+});
 $("pause").addEventListener("click", async () => {
   try {
     renderState(await api("/api/pause", { method: "POST", body: JSON.stringify({ paused: !state.paused }) }));

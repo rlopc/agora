@@ -56,7 +56,7 @@ def test_generates_full_config(aegis):
     assert room["args"] == ["run", "--quiet", "--frozen", "--project", "/KnowledgeBase", "agora-mcp"]
     assert room["env"] == {"AGORA_PARTICIPANT": "aegis", "AGORA_URL": "http://127.0.0.1:8766"}
     assert {t: v["approval_mode"] for t, v in room["tools"].items()} == dict.fromkeys(
-        ["pending", "send", "mark_read", "history"], "approve"
+        ["pending", "send", "mark_read", "history", "close_round"], "approve"
     )
     assert "`aegis`" in c["developer_instructions"] and 'agent_type = "subagent"' in c["developer_instructions"]
     sub = c["agents"]["subagent"]

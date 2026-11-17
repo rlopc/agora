@@ -154,6 +154,7 @@ textarea {
   font: inherit;
   resize: vertical;
 }
+.blind { display: flex; gap: 4px; align-items: center; min-height: 36px; font-size: 13px; color: var(--muted); white-space: nowrap; }
 .reply { display: flex; gap: 8px; align-items: center; margin-bottom: 6px; font-size: 13px; color: var(--muted); }
 
 /* Below the header: this way they do not cover the most recent messages, which are at the bottom. */
