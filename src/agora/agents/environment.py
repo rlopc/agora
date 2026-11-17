@@ -49,10 +49,15 @@ def wait_for_room(url: str, timeout: float = 15) -> bool:
     return False
 
 
+def hook_command(name: str, p_id: str, environment: Environment, project: str | None = None) -> str:
+    """Hook command that runs the room's CLI `name` for the agent `p_id`."""
+    project = project or environment.project.as_posix()
+    return f"uv run --quiet --frozen --project {project} {name} --participant {p_id} --url {environment.url}"
+
+
 def pending_command(p_id: str, environment: Environment, event: str | None = None, project: str | None = None) -> str:
     """Hook command that shows the agent its pending messages."""
-    project = project or environment.project.as_posix()
-    command = f"uv run --quiet --frozen --project {project} agora-pending --participant {p_id} --url {environment.url}"
+    command = hook_command("agora-pending", p_id, environment, project)
     return f"{command} --json-event {event}" if event else command
 
 

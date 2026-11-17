@@ -20,6 +20,7 @@ agora-launch = "agora.cli:main_launch"
 agora-start = "agora.cli:main_start"
 agora-watch = "agora.agents.watch:main_watch"
 agora-pending = "agora.agents.watch:main_pending"
+agora-permission = "agora.agents.permission:main_permission"
 
 [dependency-groups]
 dev = [

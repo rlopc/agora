@@ -21,6 +21,17 @@
           }
         ]
       }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "uv run --quiet --frozen --project \"${CLAUDE_PROJECT_DIR}\" agora-permission --participant claude --url http://127.0.0.1:8765",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   },
   "permissions": {

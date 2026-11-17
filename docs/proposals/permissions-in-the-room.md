@@ -1,6 +1,6 @@
 # Proposal: answer permission requests from the room
 
-Status: proposal, not implemented.
+Status: phase 1 (notice) implemented; phase 2 (deciding from the room) not implemented.
 
 ## Problem
 
@@ -24,7 +24,12 @@ Both hooks receive `tool_name` and `tool_input` (Codex adds a human-readable `to
 
 Sources: [Claude Code hooks](https://code.claude.com/docs/en/hooks), [Codex hooks](https://developers.openai.com/codex/hooks), [Antigravity hooks](https://antigravity.google/docs/hooks).
 
-## Design
+## Phases
+
+1. **Notice (implemented).** A `PermissionRequest` hook in Claude Code runs `agora-permission --participant ID`, which posts to the room, mentioning the user, which agent is waiting and for what (`Bash: <command>`, the file, or the input), and prints nothing. The terminal prompt stays and the user answers it there. This solves finding the right window at a fraction of the cost: it reuses `POST /api/messages` and the hook generator, needs no token (it grants nothing an agent could not already do: send a message) and leaves nothing pending, since it is a message, not a request. Codex and Antigravity are unchanged. Limit: the notice is an agent message, so it counts as a hop.
+2. **Deciding from the room (not implemented).** The design below. Worth it only if, with phase 1 in use, going to the terminal is still a bottleneck. It builds on phase 1's hook and command, and still needs the checks listed under "Still to verify".
+
+## Design (phase 2)
 
 1. **Hook.** `agora-prepare` adds a `PermissionRequest` hook (Claude Code and Codex) that runs a new command, `agora-permission --participant ID`. It reads the request from stdin and posts it to the room.
 2. **Room.** A new `permission` record (agent, tool, input, description, created, decision, decided). The UI shows pending requests at the top, with «Allow» and «Deny»; a server-sent event announces each one.
