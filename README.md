@@ -46,7 +46,7 @@ uv run pyright       # types
 uv run ruff check    # lint
 ```
 
-`uv run pre-commit install` runs these checks (tests only before pushing), Ruff's formatter, a secret scan (gitleaks), the workflow linters (actionlint, zizmor) and some file hygiene hooks on each commit. CI runs them all again.
+`uv run pre-commit install` runs these checks (tests only before pushing), Ruff's formatter, a secret scan (gitleaks), the workflow linters (actionlint, zizmor), a local link check (lychee) and some file hygiene hooks on each commit. CI runs them all again, and also CodeQL, OpenSSF Scorecard, a pull request title check and a weekly external link check. Releases and the changelog are made by release-please ([CONTRIBUTING.md](CONTRIBUTING.md)).
 
 Security reports: [SECURITY.md](SECURITY.md). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
 
