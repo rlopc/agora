@@ -112,7 +112,7 @@ The notice sent to Claude and Codex includes the pending messages (up to 1000 ch
 
 ## Configuration (`agora.toml`)
 
-Values declared on a participant win; anything still unset is taken from `[tools.<tool>]`. Relative paths (`folder`, `read_dirs`, `write_dirs`, `db`) are relative to the folder of `agora.toml`.
+Values declared on a participant win; anything still unset is taken from `[tools.<tool>]`. Relative paths (`folder`, `read_dirs`, `write_dirs`, `db`, and Codex's `homes` and `codex_home`) are relative to the folder of `agora.toml`.
 
 ```toml
 [room]
@@ -216,7 +216,7 @@ On first launch each tool asks in its window before the session exists: Claude C
 Each agent signs in with its own tool:
 
 - **Claude Code:** the user's account, shared by all Claude agents.
-- **Codex:** one `CODEX_HOME` per agent, so each agent signs in once with `CODEX_HOME=<home> codex login`; `agora-prepare` reminds you when it writes the configuration. The configuration sets `cli_auth_credentials_store = "auto"`: the credentials go to the operating system's credential store (the Keychain on macOS) when there is one, or to `CODEX_HOME/auth.json` otherwise.
+- **Codex:** one `CODEX_HOME` per agent, so each agent signs in once with `CODEX_HOME=<home> codex login`; `agora-prepare` reminds you when it writes the configuration. The configuration sets `cli_auth_credentials_store = "auto"`: the credentials go to the operating system's credential store (the Keychain on macOS) when there is one, or to `CODEX_HOME/auth.json` otherwise. On macOS each `CODEX_HOME` gets its own Keychain entry, so one agent's login does not replace another's (checked with Codex 0.169).
 - **Antigravity CLI:** the user's Google account, shared by all Antigravity agents (there is no equivalent of `CODEX_HOME`).
 
 ## Web API and MCP
@@ -282,4 +282,5 @@ uv run ruff check    # lint (ruff format formats)
 | Codex does not wake | Check its `CODEX_HOME` and folder, and that a main session exists (`agora-launch` creates one). |
 | Antigravity does not react | Expected until it calls the model: write «Answer the room.» in its window. A bare «Continue.» makes it explore the folder instead of answering. |
 | The room ignores a configuration change | Run `agora-prepare` and restart the room: it reads `agora.toml` when it starts. |
+| Codex's window does not show a woken turn | Expected: a turn started by `codex queue` shows up when you return to the conversation view; the answer is already in the room. |
 | Codex asks to trust the hooks again | Expected after `agora-prepare` changed `<folder>/.codex/hooks.json`. |

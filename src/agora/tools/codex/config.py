@@ -30,10 +30,11 @@ class CodexOptions:
 
 
 def resolve_options(data: Mapping[str, Any], defaults: Mapping[str, Any], base: Path) -> CodexOptions:
+    # Relative to agora.toml's folder, like the other paths; an absolute path stays as it is.
     if "codex_home" in data:
-        return CodexOptions(Path(data["codex_home"]))
+        return CodexOptions(base / data["codex_home"])
     homes = defaults.get("homes")
-    return CodexOptions(Path(homes) / str(data["id"]).lower() if homes else None)
+    return CodexOptions(base / homes / str(data["id"]).lower() if homes else None)
 
 
 def own_note(p: ResolvedAgent, environment: Environment) -> list[str]:
