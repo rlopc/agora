@@ -44,6 +44,13 @@ repos:
         language: unsupported
         pass_filenames: false
 
+      # Prose and code are English only; settings in pyproject.toml.
+      - id: codespell
+        name: codespell
+        entry: mise exec -- uv run --locked codespell
+        language: unsupported
+        types: [text]
+
       - id: actionlint
         name: actionlint
         entry: mise exec -- actionlint
