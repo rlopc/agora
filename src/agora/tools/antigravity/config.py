@@ -16,7 +16,7 @@ EVENTS = ("SessionStart", "PreInvocation")
 
 def own_note(p: ResolvedAgent, environment: Environment) -> list[str]:
     return [
-        "- The room cannot wake you: its pending messages reach you before each model call; handle them with `pending()`."
+        "- The room cannot wake you: its pending messages reach you before each model call; answer them in the room with `send`, not in your chat."
     ]
 
 

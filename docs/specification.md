@@ -265,6 +265,6 @@ uv run ruff check    # lint (ruff format formats)
 | An agent does not wake | Check the pause, `max_hops`, `max_moderator_turns`, batching and the error in the UI; see [Wakers](#wakers) for what each tool needs. |
 | Claude Code does not wake | Answer the first-run dialogs in its window (trust the folder, use the `agora` MCP), or open an interactive session in the agent's exact folder; do not open a second Claude Code session there. Then wake it again from the UI. |
 | Codex does not wake | Check its `CODEX_HOME` and folder, and that a main session exists (`agora-launch` creates one). |
-| Antigravity does not react | Expected until it calls the model: write to it in its window. |
+| Antigravity does not react | Expected until it calls the model: write «Answer the room.» in its window. A bare «Continue.» makes it explore the folder instead of answering. |
 | The room ignores a configuration change | Run `agora-prepare` and restart the room: it reads `agora.toml` when it starts. |
 | Codex asks to trust the hooks again | Expected after `agora-prepare` changed `<folder>/.codex/hooks.json`. |

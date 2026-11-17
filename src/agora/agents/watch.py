@@ -129,8 +129,10 @@ def main_pending(argv: Sequence[str] | None = None) -> None:
         pending = []
     lines = []
     if pending:
+        # Without this, an agent that is not woken through the MCP (Antigravity) may answer in its own chat.
         lines.append(
-            f"[agora] {len(pending)} pending message(s) for @{args.participant} (handle them with the `agora` MCP):"
+            f"[agora] {len(pending)} pending message(s) for @{args.participant}. Answer in the room with the `send` "
+            "tool of the `agora` MCP (set `reply_to`), not in this chat; use `mark_read` for what needs no reply:"
         )
         lines.extend(format_line(m) for m in pending)
     if args.json_event:

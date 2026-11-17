@@ -23,7 +23,7 @@ class Antigravity:
     default_waker = None
     own_keys = frozenset()
     loads_parent_instructions = True  # AGENTS.md and rules of parent folders, up to the repository root
-    first_run = "trust the folder"
+    first_run = "trust the folder; then, to have it answer the room, write «Answer the room.» in its window"
 
     def resolve(self, data: Mapping[str, Any], defaults: Mapping[str, Any], base: Path) -> None:
         return None
@@ -47,7 +47,10 @@ class Antigravity:
 
     def notices(self, p: ResolvedAgent, changed: Sequence[Path]) -> list[str]:
         if changed and p.waker is None:
-            return ["The room cannot wake it: it sees the messages when it next calls the model."]
+            return [
+                "The room cannot wake it: to have it answer, write «Answer the room.» in its window "
+                "(a bare «Continue.» makes it explore the folder instead)."
+            ]
         return []
 
     def startup_warning(self, p: ResolvedAgent, waker: Waker) -> str | None:
