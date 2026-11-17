@@ -25,8 +25,8 @@ jobs:
             Dependabot does not update mise.toml. Run `mise upgrade --bump`,
             which upgrades every tool to its newest release at least 7 days
             old and updates mise.lock, and read its warnings. Also check the
-            pins nothing updates: mise's version in .github/workflows/ci.yml
-            (and min_version in mise.toml), the runner labels in every
+            pins nothing updates: mise's version in the workflows (ci.yml,
+            links.yml, release.yml) and min_version in mise.toml, the runner labels in every
             workflow, and uv_build's bounds in pyproject.toml (uv's version in
             mise.toml). Then open a pull request.
         run: |

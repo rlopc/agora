@@ -11,6 +11,8 @@ actionlint = "1.7.12"
 # On PATH, so actionlint also checks the `run:` scripts of the workflows.
 shellcheck = "0.11.0"
 zizmor = "1.32.0"
+# Links and anchors in the Markdown files: offline in pre-commit, online in links.yml.
+lychee = "0.24.2"
 
 [settings]
 # Skip versions published less than 7 days ago, for `mise upgrade`.

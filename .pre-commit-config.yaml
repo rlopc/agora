@@ -30,12 +30,16 @@ repos:
         entry: mise exec -- uv run --locked end-of-file-fixer
         language: unsupported
         types: [text]
+        # Written by release-please, which would undo the fix on each release PR.
+        exclude: ^(CHANGELOG\.md|\.release-please-manifest\.json)$
 
       - id: trailing-whitespace
         name: trim trailing whitespace
         entry: mise exec -- uv run --locked trailing-whitespace-fixer --markdown-linebreak-ext=md
         language: unsupported
         types: [text]
+        # Written by release-please, which would undo the fix on each release PR.
+        exclude: ^(CHANGELOG\.md|\.release-please-manifest\.json)$
 
       # Secrets never go into the repository.
       - id: gitleaks
@@ -50,6 +54,15 @@ repos:
         entry: mise exec -- uv run --locked codespell
         language: unsupported
         types: [text]
+
+      # Local links and anchors in every versioned Markdown file, so a renamed
+      # heading is caught in the files that link to it; links.yml checks online.
+      - id: lychee
+        name: lychee
+        entry: bash -c "git ls-files '*.md' | mise exec -- lychee --offline --files-from -"
+        language: unsupported
+        types: [markdown]
+        pass_filenames: false
 
       - id: actionlint
         name: actionlint

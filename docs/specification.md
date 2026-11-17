@@ -268,7 +268,7 @@ uv run pyright       # types (src/)
 uv run ruff check    # lint (ruff format formats)
 ```
 
-`uv run pre-commit run --all-files` runs every commit hook; CI runs them too, with a secret scan of the whole history and the tests.
+`uv run pre-commit run --all-files` runs every commit hook; CI runs them too, with a secret scan of the whole history and the tests. The other workflows in `.github/workflows/` run CodeQL, OpenSSF Scorecard, the pull request title check, a weekly external link check, the reminder to update `mise.toml` and the releases.
 
 ## Troubleshooting
 
