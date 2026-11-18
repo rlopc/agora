@@ -48,7 +48,20 @@ def test_generates_mcp_hooks_and_rule(gemini):
         "AGORA_URL": "http://127.0.0.1:8766",
     }
     own = [{"type": "command", "command": COMMAND, "timeout": 10}]
-    assert read(agents / "hooks.json") == {"agora": {"SessionStart": own, "PreInvocation": own}}
+    permission = {
+        "type": "command",
+        "command": "uv run --quiet --frozen --project /work/room agora-permission --participant gemini "
+        "--url http://127.0.0.1:8766 --antigravity",
+        # Longer than the room waits (600 s): on timeout agy fails the call instead of asking.
+        "timeout": 630,
+    }
+    assert read(agents / "hooks.json") == {
+        "agora": {
+            "SessionStart": own,
+            "PreInvocation": own,
+            "PreToolUse": [{"matcher": "run_command", "hooks": [permission]}],
+        }
+    }
     rule = (agents / "rules" / "agora.md").read_text(encoding="utf-8")
     # Without a valid trigger, Antigravity ignores the rule.
     assert rule.startswith("---\ntrigger: always_on\n") and "`gemini`" in rule and "cannot wake you" in rule

@@ -1,6 +1,6 @@
 import json
 
-from agora.agents.permission import LIMIT, answer, describe, key
+from agora.agents.permission import LIMIT, answer, describe, from_antigravity, key
 
 
 def test_describes_command_file_or_whole_input():
@@ -22,6 +22,27 @@ def test_answer_only_with_a_decision():
         "hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": {"behavior": "deny"}}
     }
     assert answer(None) == answer("maybe") == ""
+
+
+def test_antigravity_answers_with_its_own_decisions():
+    # agy's `allow` would hand the call back to its rules, which ask: the room's allow approves it.
+    assert json.loads(answer("allow", antigravity=True)) == {"decision": "auto_approve"}
+    assert json.loads(answer("deny", antigravity=True))["decision"] == "deny"
+    assert answer(None, antigravity=True) == ""
+
+
+def test_antigravity_request_in_the_shape_of_the_others():
+    request = {
+        "conversationId": "c1",
+        "toolCall": {"name": "run_command", "id": "call_1", "args": {"CommandLine": "ls -la", "Cwd": "/w"}},
+    }
+    assert from_antigravity(request) == {
+        "session_id": "c1",
+        "tool_name": "run_command",
+        "tool_input": {"command": "ls -la"},
+    }
+    assert describe(from_antigravity(request)) == "run_command: ls -la"
+    assert from_antigravity({}) == {"session_id": None, "tool_name": None, "tool_input": {}}
 
 
 def test_key_is_the_same_for_the_request_and_the_hooks_after_the_call():
