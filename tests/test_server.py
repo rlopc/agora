@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -115,6 +116,68 @@ def test_watch_wakes_claude(server):
         process.terminate()
         process.wait()
         process.stdout.close()
+
+
+def stop_hook(url, in_sh=False):
+    command = [executable("agora-watch"), "--participant", "claude", "--url", url, "--wait", "1", "--stop-hook"]
+    if in_sh:  # `; true`: sh does not exec, so the hook has a parent to lose
+        command = ["/bin/sh", "-c", " ".join(command) + "; true"]
+    return subprocess.Popen(command, stdout=subprocess.PIPE, text=True, encoding="utf-8")
+
+
+def listening(url):
+    return httpx.get(f"{url}/api/state").json()["participants"]["claude"]["listening"]
+
+
+def test_stop_hook_continues_on_the_next_wake(server):
+    url, _ = server
+    httpx.post(f"{url}/api/messages", json={"text": "@claude seen and left pending"})
+    httpx.get(f"{url}/api/pending", params={"participant": "claude", "activity": True})
+    hook = stop_hook(url)
+    try:
+        # Woken before its last activity: it already saw it, so it does not loop on it.
+        assert wait_for(lambda: listening(url))
+        assert hook.poll() is None
+        httpx.post(f"{url}/api/messages", json={"text": "@claude new"})
+        out, _ = hook.communicate(timeout=10)
+    finally:
+        hook.kill()
+    # The messages arrive through the PreInvocation hook, before the model call that follows.
+    assert json.loads(out) == {
+        "decision": "continue",
+        "reason": "[agora] The room woke you: its pending messages follow.",
+    }
+
+
+def test_stop_hook_continues_at_once_for_a_wake_it_did_not_see(server):
+    url, _ = server
+    httpx.post(f"{url}/api/messages", json={"text": "@claude during its last model call"})
+    out, _ = stop_hook(url).communicate(timeout=10)
+    assert json.loads(out)["decision"] == "continue"
+
+
+def test_stop_hook_stops_waiting_when_its_parent_dies(server):
+    url, _ = server
+    parent = stop_hook(url, in_sh=True)
+    assert wait_for(lambda: listening(url))
+    [hook] = subprocess.run(["/usr/bin/pgrep", "-P", str(parent.pid)], capture_output=True, text=True).stdout.split()
+    parent.kill()
+    parent.wait(timeout=5)
+    parent.stdout.close()
+    assert wait_for(lambda: not alive(int(hook)))
+
+
+def alive(pid):
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    return True
+
+
+def test_stop_hook_with_the_room_down():
+    out, _ = stop_hook("http://127.0.0.1:9").communicate(timeout=10)
+    assert json.loads(out) == {}
 
 
 def test_pending_for_hooks(server):
