@@ -76,7 +76,6 @@ def build(
     if not participants:
         raise ValueError("agora.toml defines no participants")
 
-    store = SqliteStore(db_path(config, base))
     channel = WebChannel()
     threads = ThreadPoolExecutor(max_workers=4, thread_name_prefix="wake")
 
@@ -96,6 +95,8 @@ def build(
 
     wakers = {p.id: w for p in resolved if (w := create_waker(p, tools, context(p.id))) is not None}
     warnings = tuple(text for p in resolved if p.id in wakers and (text := _warning(p, wakers[p.id], tools)))
+    # Opened last, so that a failure creating the wakers does not leave the connection open.
+    store = SqliteStore(db_path(config, base))
     try:
         room = Room(
             participants,
