@@ -1,12 +1,13 @@
 """The `agora-permission` CLI: lets the user answer an agent's permission request from the room.
 
 It runs as a `PermissionRequest` hook. It posts the request to the room and waits on that same
-connection; meanwhile the tool's own prompt stays open in the agent's terminal. If the user
-answers in the room first, it prints the decision for the tool. If they deny it in the terminal,
-Claude Code kills the hook and the room sees the connection close; if they allow it, the hook
-keeps waiting, so with `--done`, as a `PostToolUse` and `PostToolUseFailure` hook, it tells the
-room that the call ran. If the room is down or does not decide, it prints nothing and the tool
-asks as usual.
+connection. Claude Code keeps its own prompt open in the agent's terminal meanwhile; Codex shows
+its prompt only once the hook ends without a decision. If the user answers in the room first, it
+prints the decision for the tool. If they deny it in Claude Code's terminal, or interrupt Codex,
+the tool kills the hook and the room sees the connection close; if they allow it in Claude Code's
+terminal, the hook keeps waiting, so with `--done`, as a `PostToolUse` and `PostToolUseFailure`
+hook, it tells the room that the call ran. If the room is down or does not decide, it prints
+nothing and the tool asks as usual.
 """
 
 from __future__ import annotations

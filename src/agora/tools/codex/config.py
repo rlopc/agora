@@ -10,9 +10,10 @@ from typing import Any
 import tomlkit
 
 from agora.agents.config import ResolvedAgent
-from agora.agents.environment import Environment, mcp_server, pending_command
+from agora.agents.environment import Environment, hook_command, mcp_server, pending_command
 from agora.agents.merge import at_path, put, table, update_json, update_toml
 from agora.agents.notes import note
+from agora.core import PERMISSION_WAIT
 from agora.paths import same_path
 
 SUBAGENT = "subagent"
@@ -60,8 +61,8 @@ def generate_codex(p: ResolvedAgent, environment: Environment, write: bool = Tru
         if p.effort:
             put(doc, "model_reasoning_effort", p.effort)
         put(doc, "sandbox_mode", "workspace-write")
-        # Nobody watches the console during the debate: the sandbox sets the limits and Codex does not ask.
-        put(doc, "approval_policy", "never")
+        # Codex asks only to leave the sandbox, and the user answers from the room (see the PermissionRequest hook).
+        put(doc, "approval_policy", "on-request")
         put(doc, "check_for_update_on_startup", False)
         # Each agent logs in with its own CODEX_HOME; the OS credential store keeps the token out of plain files.
         put(doc, "cli_auth_credentials_store", "auto")
@@ -87,13 +88,27 @@ def generate_codex(p: ResolvedAgent, environment: Environment, write: bool = Tru
 
     def change_hooks(data: dict) -> None:
         events = data.setdefault("hooks", {})
-        for event in EVENTS:
-            own = {"type": "command", "command": pending_command(p.id, environment, event), "timeout": 10}
+        own = {
+            event: (
+                "agora-pending",
+                {"type": "command", "command": pending_command(p.id, environment, event), "timeout": 10},
+            )
+            for event in EVENTS
+        }
+        permission = {
+            "type": "command",
+            "command": hook_command("agora-permission", p.id, environment),
+            # It waits for the user to answer in the room; Codex shows its own prompt only if the room does not.
+            "timeout": PERMISSION_WAIT,
+        }
+        # Unlike Claude Code's, the request is never pending once the call runs: no hook after the call is needed.
+        own["PermissionRequest"] = ("agora-permission", permission)
+        for event, (name, hook) in own.items():
             groups = [
-                {**g, "hooks": [h for h in g.get("hooks", []) if "agora-pending" not in h.get("command", "")]}
+                {**g, "hooks": [h for h in g.get("hooks", []) if name not in h.get("command", "")]}
                 for g in events.get(event, [])
             ]
-            events[event] = [g for g in groups if g["hooks"]] + [{"hooks": [own]}]
+            events[event] = [g for g in groups if g["hooks"]] + [{"hooks": [hook]}]
 
     changed = []
     if update_toml(config, change_config, write):

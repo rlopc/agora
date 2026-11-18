@@ -1,6 +1,6 @@
 # Proposal: answer permission requests from the room
 
-Status: phase 2 (deciding from the room) implemented for Claude Code; it replaced phase 1 (notice). Codex and Antigravity are not covered.
+Status: phase 2 (deciding from the room) implemented for Claude Code and Codex; it replaced phase 1 (notice). Antigravity is not covered.
 
 ## Problem
 
@@ -36,7 +36,7 @@ Sources: [Claude Code hooks](https://code.claude.com/docs/en/hooks), [Codex hook
 3. **Waiting.** Claude Code shows its prompt while the hook runs, so the room and the terminal race and the first answer wins. The room answers on the same connection the hook opened, after up to 600 seconds; with a decision the hook prints the tool's JSON.
 4. **Room down or stopping.** If the room is not reachable, or stops while the hook waits, the hook prints nothing: the tool asks as today.
 5. **Answered elsewhere.** When the user denies in the terminal or the hook times out, Claude Code kills the hook. Whatever the signal (even `SIGKILL`), the connection closes; the room checks for it while it waits and marks the request `terminal`. When the user allows in the terminal, Claude Code does not stop the hook: the call runs and the hook would keep waiting until its timeout. So `PostToolUse` and `PostToolUseFailure` hooks run `agora-permission --done`, and the room closes that call's pending request and answers its hook with no decision. The hooks share no call id, so the call is matched by session, tool and input (hashed). One race remains: if the user answers in the terminal just as the room answers, the room shows its own decision although the terminal's won.
-6. **Codex (not covered).** Today `approval_policy = "never"`, so Codex never asks and the hook would never fire. Using this feature means switching to an approval policy that asks (`on-request`), which changes Codex from "fail outside the sandbox" to "ask the room", and the points under "Still to verify".
+6. **Codex.** `approval_policy` goes from `never` to `on-request`, so Codex asks to leave the sandbox instead of failing, and `hooks.json` gets the same `PermissionRequest` hook. Codex does not race: it waits for the hook and shows its prompt only if the hook ends without a decision (the room stops waiting, the room is down, or the hook times out). So a request is never pending when the call runs and Codex needs no hook after the call. Interrupting Codex kills the hook, and the room marks the request `terminal`. If nobody answers in the room, the agent then waits on its terminal prompt, as Claude Code does.
 7. **Antigravity (not covered).** Its `PreToolUse` hook fires on every call, so the room would have to ask for all of them or copy `agy`'s permission rules.
 8. **Out of scope.** Only allow and deny: no `deny` message (not verified) and no «always allow» (`permission_suggestions`, which would need `updatedPermissions`).
 
@@ -77,11 +77,21 @@ Claude Code 2.1.311, `default` permission mode, the room's own hooks, Haiku (202
 
 The `PermissionRequest` input has no `tool_use_id`; the `PostToolUse` input has.
 
+Codex 0.170.0, `on-request` approval policy, `workspace-write` sandbox, a `Bash` call that needs the network, with a probe hook (2026-11-18):
+
+| Case | Result |
+| --- | --- |
+| The call needs to leave the sandbox | `PermissionRequest` fires, after `PreToolUse`. Its input has `session_id`, `turn_id`, `tool_name` (`Bash`) and `tool_input` with `command` and Codex's reason for asking (`description`); no `tool_use_id`. |
+| Hook waiting | The terminal shows «Running hook», not the prompt: there is no race. |
+| Hook prints `allow` | The call runs without a prompt. |
+| Hook prints `deny`, with or without `message` | The call does not run («Blocked by hook»); the agent gets the message, or «PermissionRequest hook denied approval», and does not retry. No `PostToolUse`. |
+| Hook exits 0 with no output, or times out | The normal prompt appears; «Yes» runs the call and `PostToolUse` fires. |
+| The user interrupts Codex (Esc) while the hook waits | The hook process is killed. |
+
 Still to verify:
 
 - Claude Code: `deny` with a `message` (only documented).
-- Codex: that `PermissionRequest` fires with the agent's approval policy, how the sandbox and approval settings change once it is no longer `never`, whether its prompt also races with the hook, and what it does when the hook times out.
 
 ## Cost
 
-A new command behaviour, an in-memory resource in `core` with four endpoints, a UI panel, the token (in the room and in `agora-start`), a longer hook timeout and two more hooks in the Claude Code generator (one process of about 60 ms after every tool call), with their tests. Codex would add a decision about its approval policy.
+A new command behaviour, an in-memory resource in `core` with four endpoints, a UI panel, the token (in the room and in `agora-start`), a longer hook timeout and two more hooks in the Claude Code generator (one process of about 60 ms after every tool call), with their tests. Codex adds its approval policy and one more hook in its generator.
