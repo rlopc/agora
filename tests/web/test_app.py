@@ -1,5 +1,6 @@
 import asyncio
 import threading
+import time
 
 import pytest
 from fastapi.testclient import TestClient
@@ -154,8 +155,6 @@ def test_long_poll_does_not_wait_if_channel_is_closed(open_store):
     room = Room(PARTICIPANTS, open_store(), [channel])
     client = TestClient(create_app(room, channel))
     channel.close()
-    import time
-
     start = time.monotonic()
     assert client.get("/api/pending", params={"participant": "claude", "wait": 5}).json() == []
     assert time.monotonic() - start < 2
@@ -189,3 +188,94 @@ def test_blind_round(setup):
     assert client.post("/api/round/close").json()["round"] is None
     assert client.post("/api/round/close").status_code == 400
     assert client.get("/api/history", params={"participant": "nobody"}).status_code == 400
+
+
+@pytest.fixture
+def guarded(open_store):
+    channel = WebChannel()
+    room = Room(PARTICIPANTS, open_store(), [channel])
+    return TestClient(create_app(room, channel, token="secret")), channel
+
+
+def ask_in_thread(client, answers):
+    thread = threading.Thread(
+        target=lambda: answers.append(
+            client.post("/api/permissions", json={"participant": "claude", "summary": "Bash: make"}).json()
+        )
+    )
+    thread.start()
+    return thread
+
+
+def wait_pending(client):
+    for _ in range(50):
+        if pending := [p for p in client.get("/api/permissions").json()["permissions"] if p["status"] == "pending"]:
+            return pending[0]
+        time.sleep(0.05)
+    raise AssertionError("no pending permission request")
+
+
+def test_token_link_leaves_a_cookie(guarded):
+    client, _ = guarded
+    assert client.get("/api/permissions").json() == {"can_decide": False, "permissions": []}
+    wrong = client.get("/?token=nope", follow_redirects=False)
+    assert wrong.status_code == 303 and "set-cookie" not in wrong.headers
+    right = client.get("/?token=secret", follow_redirects=False)
+    assert right.status_code == 303 and right.headers["location"] == "/"
+    cookie = right.headers["set-cookie"]
+    assert cookie.startswith("agora-80=secret;") and "HttpOnly" in cookie and "SameSite=strict" in cookie
+    assert client.get("/api/permissions").json()["can_decide"] is True
+
+
+def test_decide_from_the_room(guarded):
+    client, _ = guarded
+    client.get("/?token=secret")
+    answers = []
+    thread = ask_in_thread(client, answers)
+    item = wait_pending(client)
+    assert item["participant"] == "claude" and item["summary"] == "Bash: make"
+    assert client.post(f"/api/permissions/{item['id']}", json={"allow": False}).json()["status"] == "denied"
+    thread.join(5)
+    assert answers == [{"decision": "deny"}]
+    assert client.post(f"/api/permissions/{item['id']}", json={"allow": True}).status_code == 409
+    assert client.post("/api/permissions/99", json={"allow": True}).status_code == 404
+
+
+def test_deciding_needs_the_token(guarded, open_store):
+    client, channel = guarded
+    answers = []
+    thread = ask_in_thread(client, answers)
+    item = wait_pending(client)
+    client.cookies.set("agora-80", "nope")
+    assert client.post(f"/api/permissions/{item['id']}", json={"allow": True}).status_code == 403
+    channel.close()  # the room stops: the hook gets no decision and the terminal asks
+    thread.join(5)
+    assert answers == [{"decision": None}]
+    assert client.get("/api/permissions").json()["permissions"][0]["status"] == "terminal"
+    room = Room(PARTICIPANTS, open_store(), [])
+    untokened = TestClient(create_app(room, WebChannel()))
+    untokened.cookies.set("agora-80", "")
+    assert untokened.post("/api/permissions/1", json={"allow": True}).status_code == 403
+
+
+def test_only_agents_ask_for_permission(guarded):
+    client, _ = guarded
+    r = client.post("/api/permissions", json={"participant": "user", "summary": "Bash: ls"})
+    assert r.status_code == 400
+
+
+def test_done_releases_the_waiting_hook(guarded):
+    client, _ = guarded
+    answers = []
+    thread = threading.Thread(
+        target=lambda: answers.append(
+            client.post("/api/permissions", json={"participant": "claude", "summary": "Bash: make", "key": "k"}).json()
+        )
+    )
+    thread.start()
+    item = wait_pending(client)
+    assert client.post("/api/permissions/done", json={"participant": "claude", "key": "k"}).json() == {"ok": True}
+    thread.join(5)
+    assert answers == [{"decision": None}]
+    assert client.get("/api/permissions").json()["permissions"][0]["status"] == "terminal"
+    assert item["id"] == 1

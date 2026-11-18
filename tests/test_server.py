@@ -19,6 +19,7 @@ from agora.agents.tool import UnconfiguredWaker
 from agora.server import build, load_config
 
 SCRIPTS = Path(sys.executable).parent
+TOKEN = "test-token"
 
 
 def executable(name):
@@ -55,7 +56,7 @@ def server(tmp_path):
             },
         ],
     }
-    s = build(config, tmp_path, env={})
+    s = build(config, tmp_path, env={"AGORA_TOKEN": TOKEN})
     uv = uvicorn.Server(uvicorn.Config(s.app, host="127.0.0.1", port=port, log_level="warning"))
     thread = threading.Thread(target=uv.run, daemon=True)
     thread.start()
@@ -232,6 +233,21 @@ def test_build_reads_the_role(tmp_path):
         s.close()
 
 
+def test_build_generates_a_token_unless_given(tmp_path):
+    config = {"room": {"db": str(tmp_path / "s.db")}, "participants": [{"id": "user", "name": "U", "type": "human"}]}
+    servers = [
+        build(config, tmp_path, env={}),
+        build(config, tmp_path, env={}),
+        build(config, tmp_path, env={"AGORA_TOKEN": "x"}),
+    ]
+    try:
+        first, second, given = (s.token for s in servers)
+        assert len(first) >= 32 and first != second and given == "x"
+    finally:
+        for s in servers:
+            s.close()
+
+
 def test_main_with_invalid_role_exits_with_message(tmp_path, monkeypatch):
     from agora.server import main
 
@@ -332,21 +348,67 @@ def test_codex_without_thread_with_folder_finds_its_session(tmp_path):
         s.close()
 
 
-def test_permission_notice(server):
-    url, _ = server
-    permission = [executable("agora-permission"), "--participant", "claude", "--url", url]
-    request = {"tool_name": "Bash", "tool_input": {"command": "rm -rf build", "description": "Clean"}}
-    result = subprocess.run(permission, input=json.dumps(request), capture_output=True, text=True, encoding="utf-8")
-    assert result.returncode == 0 and result.stdout == ""
-    [message] = httpx.get(f"{url}/api/messages").json()
-    assert message["author"] == "claude" and message["mentions"] == ["user"]
-    assert message["text"] == "@user `claude` is waiting for permission in its terminal: `Bash: rm -rf build`"
+REQUEST = {"session_id": "s1", "tool_name": "Bash", "tool_input": {"command": "rm -rf build", "description": "Clean"}}
 
-    down = subprocess.run(
-        [executable("agora-permission"), "--participant", "claude", "--url", "http://127.0.0.1:9"],
-        input=json.dumps(request),
-        capture_output=True,
+
+def ask_permission(url, *extra):
+    hook = subprocess.Popen(
+        [executable("agora-permission"), "--participant", "claude", "--url", url, *extra],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
         text=True,
         encoding="utf-8",
     )
-    assert down.returncode == 0 and down.stdout == ""
+    assert hook.stdin is not None
+    hook.stdin.write(json.dumps(REQUEST))
+    hook.stdin.close()
+    return hook
+
+
+def permissions(url):
+    return httpx.get(f"{url}/api/permissions").json()["permissions"]
+
+
+def test_permission_answered_in_the_room(server):
+    url, _ = server
+    hook = ask_permission(url)
+    assert wait_for(lambda: permissions(url))
+    [item] = permissions(url)
+    assert item["summary"] == "Bash: rm -rf build" and item["status"] == "pending"
+    port = url.rsplit(":", 1)[1]
+    r = httpx.post(f"{url}/api/permissions/{item['id']}", json={"allow": True}, cookies={f"agora-{port}": TOKEN})
+    assert r.json()["status"] == "allowed"
+    out, _ = hook.communicate(timeout=10)
+    assert hook.returncode == 0
+    assert json.loads(out) == {
+        "hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": {"behavior": "allow"}}
+    }
+    assert httpx.get(f"{url}/api/messages").json() == []  # not a message: it is no hop
+
+
+def test_permission_allowed_in_the_terminal(server):
+    """Allowing in the terminal does not stop the hook: the hook after the call closes the request."""
+    url, _ = server
+    hook = ask_permission(url)
+    assert wait_for(lambda: permissions(url))
+    done = ask_permission(url, "--done")
+    assert done.communicate(timeout=10)[0] == "" and done.returncode == 0
+    out, _ = hook.communicate(timeout=10)
+    assert hook.returncode == 0 and out == ""
+    assert permissions(url)[0]["status"] == "terminal"
+
+
+def test_permission_denied_in_the_terminal(server):
+    """Denying in the terminal kills the hook: the room sees the connection close."""
+    url, _ = server
+    hook = ask_permission(url)
+    assert wait_for(lambda: permissions(url))
+    hook.kill()
+    hook.communicate(timeout=5)
+    assert wait_for(lambda: permissions(url)[0]["status"] == "terminal")
+
+
+def test_permission_with_the_room_down():
+    hook = ask_permission("http://127.0.0.1:9")
+    out, _ = hook.communicate(timeout=10)
+    assert hook.returncode == 0 and out == ""

@@ -3,17 +3,27 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Collection
+import secrets
+from collections.abc import Callable, Collection
 from importlib.resources import files
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import HTMLResponse, PlainTextResponse, Response, StreamingResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.types import ASGIApp, Receive, Scope, Send
 
-from agora.core import Message, Room, RoomError, format_line
+from agora.core import (
+    PERMISSION_WAIT,
+    Message,
+    PermissionAnswered,
+    PermissionNotFound,
+    Permissions,
+    Room,
+    RoomError,
+    format_line,
+)
 from agora.web.channel import WebChannel
 
 _STATIC = files("agora.web") / "static"
@@ -44,6 +54,21 @@ class Pause(BaseModel):
     paused: bool
 
 
+class NewPermission(BaseModel):
+    participant: str
+    summary: str = Field(min_length=1, max_length=1000)
+    key: str | None = Field(None, max_length=200)
+
+
+class DoneCall(BaseModel):
+    participant: str
+    key: str = Field(max_length=200)
+
+
+class Decision(BaseModel):
+    allow: bool
+
+
 def _output(messages: list[Message], format: Format):
     if format == "text":
         return PlainTextResponse("\n".join(format_line(m) for m in messages))
@@ -71,23 +96,62 @@ class OriginGuard:
         await self._app(scope, receive, send)
 
 
+def _cookie(request: Request) -> str:
+    """Cookies are shared by every port of a host: each room keeps its own."""
+    return f"agora-{request.url.port or 80}"
+
+
 def create_app(
-    room: Room, channel: WebChannel, hosts: list[str] | None = None, origins: list[str] | None = None
+    room: Room,
+    channel: WebChannel,
+    hosts: list[str] | None = None,
+    origins: list[str] | None = None,
+    token: str | None = None,
 ) -> FastAPI:
+    """Without `token`, permission requests can only be answered in the agents' terminals."""
     app = FastAPI(title="Agent room", docs_url=None, redoc_url=None)
     app.add_middleware(OriginGuard, origins=origins or ["http://testserver"])
     # Prevents DNS rebinding attacks: only local names are served.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts or ["127.0.0.1", "localhost", "testserver"])
 
+    permissions = Permissions(room.participants, room.channels)
+
     def run(function, *args, **kwargs):
         try:
             return function(*args, **kwargs)
+        except PermissionNotFound:
+            raise HTTPException(404, "unknown permission request") from None
+        except PermissionAnswered as exc:
+            raise HTTPException(409, str(exc)) from None
         except RoomError as exc:
             raise HTTPException(400, str(exc)) from None
 
+    def valid(given: str | None) -> bool:
+        return token is not None and given is not None and secrets.compare_digest(given, token)
+
+    def can_decide(request: Request) -> bool:
+        return valid(request.cookies.get(_cookie(request)))
+
+    async def wait_for(result, fetch: Callable, seconds: float, request: Request | None = None):
+        """Calls `fetch` every `_INTERVAL` until it returns something, time runs out, the server
+        stops or, with `request`, the client goes away."""
+        deadline = asyncio.get_running_loop().time() + seconds
+        while not result and not channel.closed and asyncio.get_running_loop().time() < deadline:
+            if request is not None and await request.is_disconnected():
+                break
+            await asyncio.sleep(_INTERVAL)
+            result = await asyncio.to_thread(fetch)
+        return result
+
     @app.get("/", response_class=HTMLResponse)
-    def home() -> str:
-        return (_STATIC / "index.html").read_text(encoding="utf-8")
+    def home(request: Request, token: str | None = None) -> Response:
+        """The link with the token, printed by the room, leaves it in a cookie and out of the address bar."""
+        if token is not None:
+            response = RedirectResponse("/", status_code=303)
+            if valid(token):
+                response.set_cookie(_cookie(request), token, httponly=True, samesite="strict")
+            return response
+        return HTMLResponse((_STATIC / "index.html").read_text(encoding="utf-8"))
 
     @app.get("/static/{name}")
     def static(name: str) -> Response:
@@ -158,10 +222,7 @@ def create_app(
         if watching:
             room.record_listen(participant, True)
         try:
-            deadline = asyncio.get_running_loop().time() + min(wait, _MAX_WAIT)
-            while not result and not channel.closed and asyncio.get_running_loop().time() < deadline:
-                await asyncio.sleep(_INTERVAL)
-                result = await asyncio.to_thread(room.pending, participant, since)
+            result = await wait_for(result, lambda: room.pending(participant, since), min(wait, _MAX_WAIT))
         finally:
             if watching:
                 room.record_listen(participant, False)
@@ -186,6 +247,36 @@ def create_app(
         run(room.wake_now, participant)
         return {"ok": True}
 
+    @app.post("/api/permissions")
+    async def ask(new: NewPermission, request: Request) -> dict:
+        """For the agent's hook: waits on the same connection until the user answers in the room.
+
+        If the hook stops waiting (the user answered in the terminal or the tool killed it), the
+        connection closes and the request is marked as answered there.
+        """
+        id = run(permissions.request, new.participant, new.summary, new.key).id
+        try:
+            answered = await wait_for(None, lambda: _answered(permissions, id), PERMISSION_WAIT, request)
+        finally:
+            permissions.release(id)
+        return {"decision": {"allowed": "allow", "denied": "deny"}.get(answered.status) if answered else None}
+
+    @app.post("/api/permissions/done")
+    def done(call: DoneCall) -> dict:
+        """For the hooks that run after a tool call: a request still pending was answered in the terminal."""
+        permissions.done(call.participant, call.key)
+        return {"ok": True}
+
+    @app.get("/api/permissions")
+    def permission_list(request: Request) -> dict:
+        return {"can_decide": can_decide(request), "permissions": [p.as_dict() for p in permissions.list()]}
+
+    @app.post("/api/permissions/{id}")
+    def decide(id: int, decision: Decision, request: Request) -> dict:
+        if not can_decide(request):
+            raise HTTPException(403, "open the link the room printed when it started to answer from this page")
+        return run(permissions.decide, id, decision.allow).as_dict()
+
     @app.get("/api/events")
     def events() -> StreamingResponse:
         return StreamingResponse(
@@ -195,3 +286,8 @@ def create_app(
         )
 
     return app
+
+
+def _answered(permissions: Permissions, id: int):
+    item = permissions.get(id)
+    return item if item.status != "pending" else None

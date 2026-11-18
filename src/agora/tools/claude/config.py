@@ -8,6 +8,7 @@ from agora.agents.config import ResolvedAgent
 from agora.agents.environment import Environment, hook_command, mcp_server, pending_command
 from agora.agents.merge import update_json
 from agora.agents.notes import note
+from agora.core import PERMISSION_WAIT
 
 START = "<!-- agora-prepare: start -->"
 END = "<!-- agora-prepare: end -->"
@@ -76,10 +77,15 @@ def generate_claude(p: ResolvedAgent, environment: Environment, write: bool = Tr
         permission = {
             "type": "command",
             "command": hook_command("agora-permission", p.id, environment, project),
-            "timeout": 10,
+            # It waits for the user to answer in the room; the terminal prompt stays open meanwhile.
+            "timeout": PERMISSION_WAIT,
         }
         own = {event: ("agora-pending", pending) for event in EVENTS}
         own["PermissionRequest"] = ("agora-permission", permission)
+        # Allowing in the terminal does not stop the PermissionRequest hook: these tell the room the call ran.
+        done = {"type": "command", "command": f"{permission['command']} --done", "timeout": 10}
+        for event in ("PostToolUse", "PostToolUseFailure"):
+            own[event] = ("agora-permission", done)
         for event, (name, hook) in own.items():
             groups = [
                 {**g, "hooks": [h for h in g.get("hooks", []) if name not in h.get("command", "")]}
