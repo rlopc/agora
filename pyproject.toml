@@ -33,6 +33,7 @@ dev = [
     "pre-commit-hooks>=6.0",
     "ruff>=0.17.4",
     "codespell>=2.4.3",
+    "pytest-cov>=7.1.0",
 ]
 
 [build-system]
@@ -73,6 +74,18 @@ testpaths = ["tests"]
 addopts = "--import-mode=importlib"
 # A warning is a failure: Python reports unclosed resources, such as database connections, only as warnings.
 filterwarnings = ["error"]
+
+[tool.coverage.run]
+source = ["agora"]
+branch = true
+# The tests run the commands (agora-watch, agora-pending…) as subprocesses.
+patch = ["subprocess"]
+
+[tool.coverage.report]
+# The level reached, rounded down: raise it as coverage grows.
+fail_under = 92
+show_missing = true
+skip_covered = true
 
 [tool.importlinter]
 root_package = "agora"

@@ -47,4 +47,4 @@ jobs:
       - run: mise exec -- uv run --locked pre-commit run --all-files --show-diff-on-failure
       # The pre-commit hook scans only staged changes.
       - run: mise exec -- gitleaks git --redact --no-banner
-      - run: mise exec -- uv run --locked pytest
+      - run: mise exec -- uv run --locked pytest --cov
