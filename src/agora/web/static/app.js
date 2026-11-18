@@ -42,6 +42,11 @@ function nameOf(id) {
   return state.participants.get(id)?.name || id;
 }
 
+/** "1 hop", "3 hops": the noun is in English and its plural takes an "s". */
+function count(n, noun) {
+  return `${n} ${noun}${n === 1 ? "" : "s"}`;
+}
+
 /** Text with known mentions highlighted, without interpreting HTML. */
 function body(text) {
   const fragment = document.createDocumentFragment();
@@ -165,7 +170,7 @@ function isAtBottom() {
 function renderNew() {
   const button = $("new-messages");
   button.hidden = state.unseen === 0;
-  button.textContent = state.unseen === 1 ? "1 new message ↓" : `${state.unseen} new messages ↓`;
+  button.textContent = `${count(state.unseen, "new message")} ↓`;
 }
 
 function scrollToBottom() {
@@ -201,10 +206,10 @@ function renderState(s) {
     pill.textContent = "Paused: nobody wakes up";
     pill.classList.add("paused");
   } else if (s.limit_reached) {
-    pill.textContent = `Limit of ${s.max_hops} hops: waiting for your reply`;
+    pill.textContent = `Limit of ${count(s.max_hops, "hop")}: waiting for your reply`;
     pill.classList.add("limit");
   } else if (s.turn_limit_reached) {
-    pill.textContent = `Limit of ${s.max_moderator_turns} moderator turns: waiting for your reply`;
+    pill.textContent = `Limit of ${count(s.max_moderator_turns, "moderator turn")}: waiting for your reply`;
     pill.classList.add("limit");
   } else if (s.round) {
     pill.textContent = s.round.waiting.length
