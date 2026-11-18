@@ -11,7 +11,7 @@ from agora.server import create_waker
 from agora.tools import TOOLS
 from agora.tools.antigravity.config import generate_antigravity
 
-COMMAND = "uv run --quiet --frozen --project /KnowledgeBase agora-pending --participant gemini --url http://127.0.0.1:8766 --inject-steps"
+COMMAND = "uv run --quiet --frozen --project /work/room agora-pending --participant gemini --url http://127.0.0.1:8766 --inject-steps"
 
 
 @pytest.fixture
@@ -31,7 +31,7 @@ def gemini(tmp_path):
     }
     (tmp_path / "gemini").mkdir()
     [p] = resolve(config, tmp_path, TOOLS)
-    return p, Environment(url="http://127.0.0.1:8766", project=Path("/KnowledgeBase"))
+    return p, Environment(url="http://127.0.0.1:8766", project=Path("/work/room"))
 
 
 def read(path):

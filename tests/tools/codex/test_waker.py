@@ -47,8 +47,8 @@ def test_passes_the_text_untouched(fake_codex):
 
 def test_uses_codex_home(fake_codex):
     executable, record = fake_codex
-    CodexQueueWaker("thread-1", executable, codex_home=r"/Dev/codex-enabler").wake(CODEX, [message(1, "hello")])
-    assert json.loads(record.read_text(encoding="utf-8"))[-1] == r"/Dev/codex-enabler"
+    CodexQueueWaker("thread-1", executable, codex_home=r"/work/codex-home").wake(CODEX, [message(1, "hello")])
+    assert json.loads(record.read_text(encoding="utf-8"))[-1] == r"/work/codex-home"
 
 
 def test_codex_error(fake_codex, monkeypatch):
@@ -103,34 +103,34 @@ def codex_session(home, name, cwd, timestamp, subagent=False):
 def test_finds_the_most_recent_main_session(tmp_path):
     from agora.tools.codex.waker import find_codex_session
 
-    codex_session(tmp_path, "old", r"/Dev/x/aegis", "2026-11-05T10:00:00Z")
-    codex_session(tmp_path, "new", r"/Dev/x/aegis", "2026-11-05T12:00:00Z")
+    codex_session(tmp_path, "old", r"/work/x/alpha", "2026-11-05T10:00:00Z")
+    codex_session(tmp_path, "new", r"/work/x/alpha", "2026-11-05T12:00:00Z")
     (tmp_path / "sessions" / "2026" / "11" / "05" / "rollout-broken.jsonl").write_text("{", encoding="utf-8")
-    assert find_codex_session(tmp_path, r"/Dev/x/aegis") == "new"
+    assert find_codex_session(tmp_path, r"/work/x/alpha") == "new"
 
 
 def test_ignores_subagents(tmp_path):
     from agora.tools.codex.waker import find_codex_session
 
-    codex_session(tmp_path, "main", r"/Dev/x/aegis", "2026-11-05T10:00:00Z")
-    codex_session(tmp_path, "subagent", r"/Dev/x/aegis", "2026-11-05T12:00:00Z", subagent=True)
-    assert find_codex_session(tmp_path, r"/Dev/x/aegis") == "main"
+    codex_session(tmp_path, "main", r"/work/x/alpha", "2026-11-05T10:00:00Z")
+    codex_session(tmp_path, "subagent", r"/work/x/alpha", "2026-11-05T12:00:00Z", subagent=True)
+    assert find_codex_session(tmp_path, r"/work/x/alpha") == "main"
 
 
 def test_ignores_other_folders_and_normalises_the_path(tmp_path):
     from agora.tools.codex.waker import find_codex_session
 
-    codex_session(tmp_path, "here", "/Dev/x//aegis/", "2026-11-05T10:00:00Z")
-    codex_session(tmp_path, "other", r"/Dev/x/vista", "2026-11-05T12:00:00Z")
-    assert find_codex_session(tmp_path, r"/Dev/x/aegis") == "here"
-    assert find_codex_session(tmp_path, r"/Dev/x/nothing") is None
-    assert find_codex_session(tmp_path / "missing", r"/Dev/x/aegis") is None
+    codex_session(tmp_path, "here", "/work/x//alpha/", "2026-11-05T10:00:00Z")
+    codex_session(tmp_path, "other", r"/work/x/beta", "2026-11-05T12:00:00Z")
+    assert find_codex_session(tmp_path, r"/work/x/alpha") == "here"
+    assert find_codex_session(tmp_path, r"/work/x/nothing") is None
+    assert find_codex_session(tmp_path / "missing", r"/work/x/alpha") is None
 
 
 def test_finds_the_session_if_there_is_no_thread(tmp_path, fake_codex):
     executable, record = fake_codex
-    codex_session(tmp_path, "found", r"/Dev/x/aegis", "2026-11-05T10:00:00Z")
-    w = CodexQueueWaker("", executable, codex_home=str(tmp_path), cwd=r"/Dev/x/aegis")
+    codex_session(tmp_path, "found", r"/work/x/alpha", "2026-11-05T10:00:00Z")
+    w = CodexQueueWaker("", executable, codex_home=str(tmp_path), cwd=r"/work/x/alpha")
     assert w.current_thread() == "found"
     w.wake(CODEX, [message(3, "hello")])
     args = json.loads(record.read_text(encoding="utf-8"))
@@ -139,13 +139,13 @@ def test_finds_the_session_if_there_is_no_thread(tmp_path, fake_codex):
 
 def test_explicit_thread_wins(tmp_path, fake_codex):
     executable, _ = fake_codex
-    codex_session(tmp_path, "found", r"/Dev/x/aegis", "2026-11-05T10:00:00Z")
-    w = CodexQueueWaker("written", executable, codex_home=str(tmp_path), cwd=r"/Dev/x/aegis")
+    codex_session(tmp_path, "found", r"/work/x/alpha", "2026-11-05T10:00:00Z")
+    w = CodexQueueWaker("written", executable, codex_home=str(tmp_path), cwd=r"/work/x/alpha")
     assert w.current_thread() == "written"
 
 
 def test_without_session_fails_with_message(tmp_path, fake_codex):
     executable, _ = fake_codex
-    w = CodexQueueWaker("", executable, codex_home=str(tmp_path), cwd=r"/Dev/x/aegis")
-    with pytest.raises(WakeError, match=re.escape(r"there is no Codex session open in /Dev/x/aegis")):
+    w = CodexQueueWaker("", executable, codex_home=str(tmp_path), cwd=r"/work/x/alpha")
+    with pytest.raises(WakeError, match=re.escape(r"there is no Codex session open in /work/x/alpha")):
         w.wake(CODEX, [message(3, "hello")])

@@ -32,7 +32,7 @@ def test_open_window_creates_the_session_and_then_adds_windows(monkeypatch):
         "agora",
     ]
     session["exists"] = True
-    terminal.open_window("aegis", ["uv", "run", "agora-launch", "aegis"], Path("/Debate/aegis"))
+    terminal.open_window("alpha", ["uv", "run", "agora-launch", "alpha"], Path("/Debate/alpha"))
     assert commands[-2] == ["/bin/tmux", "has-session", "-t", "=agora"]
     assert commands[-1] == [
         "/bin/tmux",
@@ -40,14 +40,14 @@ def test_open_window_creates_the_session_and_then_adds_windows(monkeypatch):
         "-t",
         "=agora:",
         "-n",
-        "aegis",
+        "alpha",
         "-c",
-        "/Debate/aegis",
+        "/Debate/alpha",
         "--",
         "uv",
         "run",
         "agora-launch",
-        "aegis",
+        "alpha",
     ]
 
 

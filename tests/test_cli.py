@@ -13,8 +13,8 @@ CONFIG = {
     "participants": [
         {"id": "user", "name": "U", "type": "human"},
         {"id": "moderator", "name": "M", "type": "agent", "folder": ".", "tool": "claude"},
-        {"id": "aegis", "name": "A", "type": "agent", "folder": "aegis", "tool": "codex"},
-        {"id": "vista", "name": "V", "type": "agent", "folder": "vista", "tool": "codex"},
+        {"id": "alpha", "name": "A", "type": "agent", "folder": "alpha", "tool": "codex"},
+        {"id": "beta", "name": "V", "type": "agent", "folder": "beta", "tool": "codex"},
     ],
 }
 BASE = Path(r"/Debate")
@@ -25,12 +25,12 @@ def agent(id):
 
 
 def test_launch_codex():
-    launch = TOOLS["codex"].launch(agent("aegis"), {"PATH": "x"})
+    launch = TOOLS["codex"].launch(agent("alpha"), {"PATH": "x"})
     # With a first message, Codex creates its session on start and the room finds it to wake it.
     assert launch.argv == ["codex", "--model", "gpt-5.6-terra", FIRST_MESSAGE]
     assert "pending" in FIRST_MESSAGE
-    assert launch.cwd == BASE / "aegis"
-    assert launch.env == {"PATH": "x", "CODEX_HOME": r"/homes/aegis"}
+    assert launch.cwd == BASE / "alpha"
+    assert launch.env == {"PATH": "x", "CODEX_HOME": r"/homes/alpha"}
 
 
 def test_launch_without_model_uses_the_tool_default():
@@ -46,15 +46,15 @@ def test_launch_claude_without_claude_variables():
 
 
 def test_start_opens_room_and_agents_in_order(monkeypatch, tmp_path, capsys):
-    for folder in ("aegis", "vista"):
+    for folder in ("alpha", "beta"):
         (tmp_path / folder).mkdir()
     path = tmp_path / "agora.toml"
     path.write_text(
         "[room]\nport = 8766\n\n[tools.codex]\nhomes = '" + str(tmp_path / "homes") + "'\n\n"
         '[[participants]]\nid = "user"\nname = "U"\ntype = "human"\n\n'
         '[[participants]]\nid = "moderator"\nname = "M"\ntype = "agent"\nfolder = "."\ntool = "claude"\n\n'
-        '[[participants]]\nid = "aegis"\nname = "A"\ntype = "agent"\nfolder = "aegis"\ntool = "codex"\n\n'
-        '[[participants]]\nid = "vista"\nname = "V"\ntype = "agent"\nfolder = "vista"\ntool = "codex"\n',
+        '[[participants]]\nid = "alpha"\nname = "A"\ntype = "agent"\nfolder = "alpha"\ntool = "codex"\n\n'
+        '[[participants]]\nid = "beta"\nname = "V"\ntype = "agent"\nfolder = "beta"\ntool = "codex"\n',
         encoding="utf-8",
     )
     opened = []
@@ -62,17 +62,17 @@ def test_start_opens_room_and_agents_in_order(monkeypatch, tmp_path, capsys):
     monkeypatch.setattr(cli, "wait_for_room", lambda url, timeout=15: True)
     monkeypatch.setattr(cli, "room_running", lambda url: False)
     cli.main_start(["--config", str(path)])
-    assert [t for t, _ in opened] == ["agora", "moderator", "aegis", "vista"]
+    assert [t for t, _ in opened] == ["agora", "moderator", "alpha", "beta"]
     assert opened[0][1][-3:] == ["agora", "--config", str(path)]
     env, variable = opened[0][1][:2]
     token = variable.removeprefix("AGORA_TOKEN=")
     assert env == "env" and len(token) >= 32
-    assert opened[2][1][-4:] == ["agora-launch", "--config", str(path), "aegis"]
-    assert (tmp_path / "homes" / "aegis" / "config.toml").is_file()  # prepared before opening
+    assert opened[2][1][-4:] == ["agora-launch", "--config", str(path), "alpha"]
+    assert (tmp_path / "homes" / "alpha" / "config.toml").is_file()  # prepared before opening
     out = capsys.readouterr().out
     assert f"Room at http://127.0.0.1:8766/?token={token};" in out
     assert "- claude (moderator): trust the folder" in out
-    assert "- codex (aegis, vista): trust the hooks" in out
+    assert "- codex (alpha, beta): trust the hooks" in out
 
 
 def test_start_does_not_open_agents_if_the_room_does_not_answer(monkeypatch, tmp_path):

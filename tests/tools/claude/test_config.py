@@ -21,12 +21,12 @@ def moderator(tmp_path):
                 "role": "moderator",
                 "folder": ".",
                 "tool": "claude",
-                "read_dirs": [r"/Dev/WorkSpace/AegisWS"],
+                "read_dirs": [r"/work/shared"],
             }
         ],
     }
     [p] = resolve(config, tmp_path, TOOLS)
-    return p, Environment(url="http://127.0.0.1:8766", project=Path("/KnowledgeBase"))
+    return p, Environment(url="http://127.0.0.1:8766", project=Path("/work/room"))
 
 
 def read(path):
@@ -34,7 +34,7 @@ def read(path):
 
 
 COMMAND = (
-    "uv run --quiet --frozen --project /KnowledgeBase agora-pending --participant moderator --url http://127.0.0.1:8766"
+    "uv run --quiet --frozen --project /work/room agora-pending --participant moderator --url http://127.0.0.1:8766"
 )
 
 PERMISSION = COMMAND.replace("agora-pending", "agora-permission")
@@ -60,7 +60,7 @@ def test_generates_mcp_settings_and_claude_md(moderator, tmp_path):
         ]
     assert settings["permissions"]["allow"] == ["mcp__agora", *READ_ONLY]
     assert all(not r.startswith("Bash(rm") for r in READ_ONLY)
-    assert settings["permissions"]["additionalDirectories"] == [r"/Dev/WorkSpace/AegisWS"]
+    assert settings["permissions"]["additionalDirectories"] == [r"/work/shared"]
     claude_md = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
     assert claude_md.startswith("@AGENTS.md\n")
     assert START in claude_md and END in claude_md and "`model: sonnet`" in claude_md and "`moderator`" in claude_md
@@ -69,7 +69,7 @@ def test_generates_mcp_settings_and_claude_md(moderator, tmp_path):
 def test_external_folder_uses_absolute_path(moderator, tmp_path):
     p, environment = moderator
     generate_claude(p, environment)
-    assert "/KnowledgeBase" in read(tmp_path / ".mcp.json")["mcpServers"]["agora"]["args"]
+    assert "/work/room" in read(tmp_path / ".mcp.json")["mcpServers"]["agora"]["args"]
 
 
 def test_internal_folder_uses_the_session_folder(moderator, tmp_path):
@@ -89,9 +89,9 @@ def test_internal_folder_uses_the_session_folder(moderator, tmp_path):
     settings = read(tmp_path / ".claude" / "settings.json")
     for event in ("SessionStart", "UserPromptSubmit"):
         [group] = settings["hooks"][event]
-        assert group["hooks"][0]["command"] == COMMAND.replace("/KnowledgeBase", PROJECT_HOOK)
+        assert group["hooks"][0]["command"] == COMMAND.replace("/work/room", PROJECT_HOOK)
     [group] = settings["hooks"]["PermissionRequest"]
-    assert group["hooks"][0]["command"] == PERMISSION.replace("/KnowledgeBase", PROJECT_HOOK)
+    assert group["hooks"][0]["command"] == PERMISSION.replace("/work/room", PROJECT_HOOK)
     assert (
         str(tmp_path) not in (tmp_path / ".mcp.json").read_text() + (tmp_path / ".claude" / "settings.json").read_text()
     )
@@ -152,6 +152,6 @@ def test_extra_write_dirs_in_additional_directories(moderator, tmp_path):
     p = replace(p, write_dirs=(Path(r"/Debate"),))
     generate_claude(p, environment)
     assert read(tmp_path / ".claude" / "settings.json")["permissions"]["additionalDirectories"] == [
-        r"/Dev/WorkSpace/AegisWS",
+        r"/work/shared",
         r"/Debate",
     ]
