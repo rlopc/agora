@@ -73,12 +73,13 @@ Claude Code 2.1.311, `default` permission mode, the room's own hooks, Haiku (202
 | «Yes» in the terminal | The hook gets no signal and keeps waiting (up to its timeout, or until the session ends). `PostToolUse` fires about a second later, with the same `session_id`, `tool_name` and `tool_input`; `PostToolUseFailure` if the call fails. |
 | A decision from the room after «Yes» in the terminal | Ignored: the call ran once. |
 | The session ends | The hook dies with it. |
+| A subagent asks for permission | Its `PermissionRequest` and `PostToolUse` carry the session's `session_id`, plus `agent_id` and `agent_type`, which the main agent's lack; the room's key includes `agent_id`. |
 
 The `PermissionRequest` input has no `tool_use_id`; the `PostToolUse` input has.
 
 Still to verify:
 
-- Claude Code: `deny` with a `message` (only documented), and that a subagent's requests and calls carry the same `session_id`.
+- Claude Code: `deny` with a `message` (only documented).
 - Codex: that `PermissionRequest` fires with the agent's approval policy, how the sandbox and approval settings change once it is no longer `never`, whether its prompt also races with the hook, and what it does when the hook times out.
 
 ## Cost
