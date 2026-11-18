@@ -1,6 +1,6 @@
 [project]
 name = "agora"
-version = "0.2.1"
+version = "0.3.0"
 description = "Local room where a user coordinates AI coding agents"
 license = "MIT"
 requires-python = ">=3.14"
