@@ -55,16 +55,24 @@ def test_generates_mcp_hooks_and_rule(gemini):
         # Longer than the room waits (600 s): on timeout agy fails the call instead of asking.
         "timeout": 630,
     }
+    stop = {
+        "type": "command",
+        "command": "uv run --quiet --frozen --project /work/room agora-watch --participant gemini "
+        "--url http://127.0.0.1:8766 --stop-hook",
+        # On timeout agy stops waiting for the room: a week.
+        "timeout": 604800,
+    }
     assert read(agents / "hooks.json") == {
         "agora": {
             "SessionStart": own,
             "PreInvocation": own,
             "PreToolUse": [{"matcher": "run_command", "hooks": [permission]}],
+            "Stop": [stop],
         }
     }
     rule = (agents / "rules" / "agora.md").read_text(encoding="utf-8")
     # Without a valid trigger, Antigravity ignores the rule.
-    assert rule.startswith("---\ntrigger: always_on\n") and "`gemini`" in rule and "cannot wake you" in rule
+    assert rule.startswith("---\ntrigger: always_on\n") and "`gemini`" in rule and "also when it wakes you" in rule
     assert generate_antigravity(p, environment) == []
 
 
@@ -88,18 +96,21 @@ def test_launch_allows_the_room_tools_only_for_the_session(gemini):
     assert launch.cwd == p.folder and launch.env == {"PATH": "x"}
 
 
-def test_the_room_does_not_wake_it_and_says_so_once(gemini):
+def test_its_stop_hook_watches_and_the_notice_says_how_to_type_once(gemini):
     p, environment = gemini
-    assert p.waker is None and create_waker(p, TOOLS, None) is None
+    assert p.waker == "watch" and isinstance(create_waker(p, TOOLS, None), watch.WatchWaker)
     tool = TOOLS["antigravity"]
-    assert "cannot wake" in tool.notices(p, generate_antigravity(p, environment))[0]
+    assert "Esc" in tool.notices(p, generate_antigravity(p, environment))[0]
     assert tool.notices(p, []) == []
 
 
 def test_pending_as_inject_steps(monkeypatch, capsys):
     message = Message(1, "user", "hello", ("gemini",), None, 0, datetime(2026, 11, 16))
-    monkeypatch.setattr(watch, "fetch_pending", lambda *a, **k: [message])
+    calls = []
+    monkeypatch.setattr(watch, "fetch_pending", lambda *a, **k: calls.append(k) or [message])
     watch.main_pending(["--participant", "gemini", "--inject-steps"])
+    # Seen before a model call: activity, so its Stop hook does not wake it for them.
+    assert calls[0]["activity"] is True
     [step] = json.loads(capsys.readouterr().out)["injectSteps"]
     assert "hello" in step["systemMessage"]["systemMessage"]
     monkeypatch.setattr(watch, "fetch_pending", lambda *a, **k: [])

@@ -1,4 +1,4 @@
-"""Antigravity CLI (`agy`) as an agent tool: configuration in its folder and no wake (the hooks deliver)."""
+"""Antigravity CLI (`agy`) as an agent tool: configuration in its folder; its Stop hook waits for the room's wakes."""
 
 from __future__ import annotations
 
@@ -19,11 +19,17 @@ SETTINGS = {"permissions": {"allow": ["mcp(agora/*)"]}}
 
 class Antigravity:
     name = "antigravity"
-    # agy has no way to receive a message from outside: typing into its terminal could answer an approval dialog.
-    default_waker = None
+    # agy cannot receive a message from outside (typing into its terminal could answer an approval dialog):
+    # its Stop hook runs `agora-watch --stop-hook`, which makes it continue when the room wakes it.
+    default_waker = "watch"
     own_keys = frozenset()
     loads_parent_instructions = True  # AGENTS.md and rules of parent folders, up to the repository root
-    first_run = "trust the folder; then, to have it answer the room, write «Answer the room.» in its window"
+    # Its Stop hook only runs after a turn, and a first message given at launch (`-i`) starts a conversation
+    # without the MCP tools: agy adds them only on a message typed once they are loaded.
+    first_run = (
+        "trust the folder; on every launch, once `/mcp` lists the `agora` tools, write «Answer the room.» in its "
+        "window: from then on the room wakes it"
+    )
 
     def resolve(self, data: Mapping[str, Any], defaults: Mapping[str, Any], base: Path) -> None:
         return None
@@ -43,13 +49,13 @@ class Antigravity:
         return Launch(argv, p.folder, dict(base_env))
 
     def create_waker(self, p: ResolvedAgent, context: WakeContext) -> Waker:
-        raise NotImplementedError("Antigravity has no waker")
+        raise NotImplementedError("Antigravity is woken by its Stop hook (waker `watch`)")
 
     def notices(self, p: ResolvedAgent, changed: Sequence[Path]) -> list[str]:
-        if changed and p.waker is None:
+        if changed:
             return [
-                "The room cannot wake it: to have it answer, write «Answer the room.» in its window "
-                "(a bare «Continue.» makes it explore the folder instead)."
+                "Between turns it waits for the room: what you type in its window is queued until Esc stops the "
+                "wait, and after Esc the room does not wake it until its next turn ends."
             ]
         return []
 

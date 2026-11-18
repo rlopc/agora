@@ -11,13 +11,15 @@ from agora.agents.notes import note
 from agora.core import PERMISSION_WAIT
 
 HOOK = "agora"
-# PreInvocation runs before every model call: the closest thing to a wake, since the room cannot wake agy.
+# PreInvocation runs before every model call, so agy also sees what arrives while it works.
 EVENTS = ("SessionStart", "PreInvocation")
+# On timeout agy kills the Stop hook and stops: until its next turn ends, the room cannot wake it.
+STOP_WAIT = 7 * 24 * 3600
 
 
 def own_note(p: ResolvedAgent, environment: Environment) -> list[str]:
     return [
-        "- The room cannot wake you: its pending messages reach you before each model call; answer them in the room with `send`, not in your chat."
+        "- The room's pending messages reach you as system messages, also when it wakes you after a turn; answer them in the room with `send`, not in your chat."
     ]
 
 
@@ -37,10 +39,16 @@ def generate_antigravity(p: ResolvedAgent, environment: Environment, write: bool
             # On timeout agy fails the call instead of asking: the hook must outlast the room's wait.
             "timeout": PERMISSION_WAIT + 30,
         }
+        stop = {
+            "type": "command",
+            "command": f"{hook_command('agora-watch', p.id, environment)} --stop-hook",
+            "timeout": STOP_WAIT,
+        }
         # In accept-edits mode agy asks before every command, unless a rule allows it; so does the room.
         data[HOOK] = {
             **{event: [own] for event in EVENTS},
             "PreToolUse": [{"matcher": "run_command", "hooks": [permission]}],
+            "Stop": [stop],
         }
 
     # Files in `rules/` without a valid trigger are silently ignored.

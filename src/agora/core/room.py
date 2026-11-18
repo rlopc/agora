@@ -238,6 +238,7 @@ class Room:
             participants[p.id] = {
                 "pending": len(self._pending(p.id)),
                 "last_wake": wake.last_wake.isoformat() if wake.last_wake else None,
+                "last_activity": wake.last_activity.isoformat() if wake.last_activity else None,
                 "error": wake.error,
                 "listening": self.listening(p.id),
             }
