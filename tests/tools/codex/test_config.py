@@ -59,6 +59,8 @@ def test_generates_full_config(alpha):
         ["pending", "send", "mark_read", "history", "close_round"], "approve"
     )
     assert "`alpha`" in c["developer_instructions"] and 'agent_type = "subagent"' in c["developer_instructions"]
+    # Without retrying outside the sandbox, Codex never asks and the room never sees the request.
+    assert "retry it asking for approval" in c["developer_instructions"]
     sub = c["agents"]["subagent"]
     assert sub["config_file"] == str(p.tool_options.home / "agents" / "subagent.toml") and sub["description"]
     assert read(Path(sub["config_file"])) == {"model": "gpt-5.6-terra", "model_reasoning_effort": "medium"}
