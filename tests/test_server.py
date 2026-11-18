@@ -111,7 +111,7 @@ def test_watch_wakes_claude(server):
         assert process.stdout.readline().strip() == "#6 codex→claude: @claude third hop"
         assert process.stdout.readline().strip() == "#7 user→claude: @claude you decide"
     finally:
-        process.kill()
+        process.terminate()
         process.wait()
         process.stdout.close()
 
