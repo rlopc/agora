@@ -47,8 +47,8 @@ def test_generates_full_config(alpha):
     assert (c["model"], c["model_reasoning_effort"]) == ("gpt-5.6-terra", "high")
     assert "model_provider" not in c
     assert (c["sandbox_mode"], c["check_for_update_on_startup"]) == ("workspace-write", False)
-    # Nobody approves in the console during the debate: the sandbox limits and Codex does not ask.
-    assert c["approval_policy"] == "never"
+    # Codex asks to leave the sandbox, and the room's PermissionRequest hook lets the user answer.
+    assert c["approval_policy"] == "on-request"
     assert c["cli_auth_credentials_store"] == "auto"
     assert c["projects"][str(p.folder)]["trust_level"] == "trusted"
     room = c["mcp_servers"]["agora"]
@@ -118,7 +118,7 @@ def test_hooks_json(alpha):
     hooks.write_text(json.dumps({"hooks": {"SessionStart": [{"hooks": [foreign]}]}}), encoding="utf-8-sig")
     generate_codex(p, environment)
     data = json.loads(hooks.read_text(encoding="utf-8"))["hooks"]
-    assert set(data) == {"SessionStart", "UserPromptSubmit"}
+    assert set(data) == {"SessionStart", "UserPromptSubmit", "PermissionRequest"}
     commands = [h["command"] for group in data["SessionStart"] for h in group["hooks"]]
     assert commands == [
         "echo hello",
@@ -126,6 +126,30 @@ def test_hooks_json(alpha):
         "--url http://127.0.0.1:8766 --json-event SessionStart",
     ]
     assert data["UserPromptSubmit"][0]["hooks"][0]["timeout"] == 10
+    [[permission]] = [g["hooks"] for g in data["PermissionRequest"]]
+    assert permission == {
+        "type": "command",
+        "command": "uv run --quiet --frozen --project /work/room agora-permission --participant alpha "
+        "--url http://127.0.0.1:8766",
+        "timeout": 600,
+    }
+
+
+def test_replaces_its_own_permission_hook(alpha):
+    p, environment = alpha
+    hooks = p.folder / ".codex" / "hooks.json"
+    hooks.parent.mkdir()
+    old = {"type": "command", "command": "uv run agora-permission --participant alpha --url http://old", "timeout": 5}
+    foreign = {"type": "command", "command": "echo audit"}
+    hooks.write_text(json.dumps({"hooks": {"PermissionRequest": [{"hooks": [foreign, old]}]}}), encoding="utf-8")
+    generate_codex(p, environment)
+    groups = json.loads(hooks.read_text(encoding="utf-8"))["hooks"]["PermissionRequest"]
+    assert [[h["command"] for h in g["hooks"]] for g in groups] == [
+        ["echo audit"],
+        [
+            "uv run --quiet --frozen --project /work/room agora-permission --participant alpha --url http://127.0.0.1:8766"
+        ],
+    ]
 
 
 def test_extra_write_dirs_in_writable_roots(alpha, tmp_path):

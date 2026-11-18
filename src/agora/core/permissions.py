@@ -1,8 +1,8 @@
 """Permission requests that an agent's hook waits on and the user can answer from the room.
 
 They live in memory only: a request exists while its hook waits, so after a restart there is
-nothing left to answer. The tool's own prompt stays open meanwhile, so whichever answers first,
-the room or the terminal, wins.
+nothing left to answer. Claude Code's own prompt stays open meanwhile, so whichever answers
+first, the room or the terminal, wins; Codex asks in its terminal only if the room does not decide.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from agora.core.model import Event, Participant
 from agora.core.ports import Channel
 from agora.core.room import RoomError
 
-# Seconds the hook waits for an answer from the room: the default hook timeout in Claude Code.
+# Seconds the hook waits for an answer from the room: the default hook timeout in Claude Code and Codex.
 PERMISSION_WAIT = 600
 # Answered requests kept for the UI, besides the pending ones.
 KEEP = 20
