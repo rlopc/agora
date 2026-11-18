@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0](https://github.com/rlopc/agora/compare/v0.1.1...v0.2.0) (2026-11-18)
+
+
+### Features
+
+* **web:** answer permission requests from the room ([#38](https://github.com/rlopc/agora/issues/38)) ([d997437](https://github.com/rlopc/agora/commit/d99743725fe158ff8db51aab4f3699ec282c0fae))
+
+
+### Bug Fixes
+
+* **web:** pluralize the limit notices ([#36](https://github.com/rlopc/agora/issues/36)) ([369a170](https://github.com/rlopc/agora/commit/369a170e89a3f78283e14d73728b26c7ca88a6ee))
+
 ## [0.1.1](https://github.com/rlopc/agora/compare/v0.1.0...v0.1.1) (2026-11-18)
 
 
