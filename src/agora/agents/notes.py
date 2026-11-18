@@ -10,4 +10,4 @@ from agora.agents.environment import Environment
 
 def note(p: ResolvedAgent, environment: Environment, own: Sequence[str]) -> str:
     """The common line plus the tool's own ones (`Tool.note`)."""
-    return "\n".join([f"- You are the participant `{p.id}` of the room (MCP `agora`, {environment.url}).", *own])
+    return "\n".join([f"- You are the participant `{p.id}` of the room (MCP `agora`, <{environment.url}>).", *own])
