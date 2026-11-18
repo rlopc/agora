@@ -1,6 +1,6 @@
 # Design debate
 
-A moderator and two Claude Code agents (proponent and critic) debate a design question you ask in the room. Each role's instructions are in its folder's `AGENTS.md`.
+A moderator and two Claude Code agents (proponent and critic) debate a design question you ask in the room. The moderator opens with a blind round, so each side gives a first take without seeing the other's. Each role's instructions are in its folder's `AGENTS.md`.
 
 Claude Code also loads the `CLAUDE.md` files of parent folders, so copy this folder outside the agora repository first and run the commands from agora's checkout:
 
