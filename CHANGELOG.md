@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/rlopc/agora/compare/v0.2.0...v0.2.1) (2026-11-18)
+
+
+### Bug Fixes
+
+* **agents:** tell subagents' permission requests apart ([#40](https://github.com/rlopc/agora/issues/40)) ([8abe6d7](https://github.com/rlopc/agora/commit/8abe6d7dee018282ab1eb0a308f06d62f6fc86b0))
+
 ## [0.2.0](https://github.com/rlopc/agora/compare/v0.1.1...v0.2.0) (2026-11-18)
 
 
