@@ -55,16 +55,16 @@ def check_store(factory: Callable[[], Store]) -> None:
     assert s.paused() is False
 
 
-def test_contract_in_memory():
-    check_store(lambda: SqliteStore(":memory:"))
+def test_contract_in_memory(open_store):
+    check_store(lambda: open_store())
 
 
-def test_contract_in_file(tmp_path):
+def test_contract_in_file(tmp_path, open_store):
     paths = iter(tmp_path / f"agora{i}.db" for i in range(10))
-    check_store(lambda: SqliteStore(next(paths)))
+    check_store(lambda: open_store(next(paths)))
 
 
-def test_adds_the_new_columns_to_an_older_database(tmp_path):
+def test_adds_the_new_columns_to_an_older_database(tmp_path, open_store):
     path = tmp_path / "agora.db"
     old = sqlite3.connect(path)
     old.execute(
@@ -77,22 +77,22 @@ def test_adds_the_new_columns_to_an_older_database(tmp_path):
     )
     old.commit()
     old.close()
-    store = SqliteStore(path)
+    store = open_store(path)
     assert store.last_message().turns == 0
     assert store.add_message("moderator", "next", [], None, 0, _T0, turns=1).turns == 1
     assert store.last_message().round is None
     assert store.add_message("claude", "answer", [], None, 0, _T0, round=1).round == 1
 
 
-def test_persists_across_openings(tmp_path):
+def test_persists_across_openings(tmp_path, open_store):
     path = tmp_path / "data" / "agora.db"
     participants = [Participant("user", "User", "human"), Participant("codex", "Codex", "agent")]
-    store = SqliteStore(path)
+    store = open_store(path)
     Room(participants, store).send("user", "@codex hello")
     store.set_paused(True)
     store.close()
 
-    reopened = SqliteStore(path)
+    reopened = open_store(path)
     assert [m.text for m in reopened.pending("codex")] == ["@codex hello"]
     assert reopened.paused() is True
 
@@ -115,8 +115,8 @@ def test_archive_without_database(tmp_path):
     assert not (tmp_path / "archive").exists()
 
 
-def test_open_round_hidden_from_other_viewers():
-    s = SqliteStore(":memory:")
+def test_open_round_hidden_from_other_viewers(open_store):
+    s = open_store()
     s.add_message("user", "@claude @codex ideas?", ["claude", "codex"], None, 0, _T0)
     round = s.open_round("user", 1, ["claude", "codex"], _T0)
     assert s.current_round() == round

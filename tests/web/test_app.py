@@ -5,7 +5,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agora.core import Event, Participant, Room
-from agora.store.sqlite import SqliteStore
 from agora.web import WebChannel, create_app
 
 PARTICIPANTS = [
@@ -24,10 +23,10 @@ class FakeWaker:
 
 
 @pytest.fixture
-def setup():
+def setup(open_store):
     channel = WebChannel()
     codex = FakeWaker()
-    room = Room(PARTICIPANTS, SqliteStore(":memory:"), [channel], {"codex": codex})
+    room = Room(PARTICIPANTS, open_store(), [channel], {"codex": codex})
     return TestClient(create_app(room, channel)), room, codex
 
 
@@ -150,9 +149,9 @@ def test_close_ends_sse_streams():
     asyncio.run(scenario())
 
 
-def test_long_poll_does_not_wait_if_channel_is_closed():
+def test_long_poll_does_not_wait_if_channel_is_closed(open_store):
     channel = WebChannel()
-    room = Room(PARTICIPANTS, SqliteStore(":memory:"), [channel])
+    room = Room(PARTICIPANTS, open_store(), [channel])
     client = TestClient(create_app(room, channel))
     channel.close()
     import time

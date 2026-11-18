@@ -10,7 +10,6 @@ from agora.core import (
     extract_mentions,
     format_line,
 )
-from agora.store.sqlite import SqliteStore
 
 PARTICIPANTS = [
     Participant("user", "User", "human"),
@@ -49,13 +48,13 @@ class FakeChannel:
 
 
 @pytest.fixture
-def env():
+def env(open_store):
     wakers = {"claude": FakeWaker(), "codex": FakeWaker()}
     channel = FakeChannel()
     sleeps = []
     room = Room(
         PARTICIPANTS,
-        SqliteStore(":memory:"),
+        open_store(),
         [channel],
         wakers,
         clock=Clock(),
@@ -70,8 +69,8 @@ def test_mentions_valid_unknown_and_without_duplicates():
     assert unknown == ("nobody",)
 
 
-def test_format_line():
-    room = Room(PARTICIPANTS, SqliteStore(":memory:"))
+def test_format_line(open_store):
+    room = Room(PARTICIPANTS, open_store())
     m1 = room.send("user", "hello").message
     m2 = room.send("claude", "@codex look", reply_to=m1.id).message
     assert format_line(m1) == "#1 user: hello"
@@ -183,8 +182,8 @@ def test_rewake_respects_hop_limit_and_pause(env):
     assert len(wakers["codex"].calls) == 1
 
 
-def test_after_restart_earlier_messages_are_not_rewoken():
-    store = SqliteStore(":memory:")
+def test_after_restart_earlier_messages_are_not_rewoken(open_store):
+    store = open_store()
     Room(PARTICIPANTS, store, wakers={"codex": FakeWaker()}).send("user", "@codex old")
     waker = FakeWaker()
     room = Room(PARTICIPANTS, store, wakers={"codex": waker})
@@ -294,12 +293,12 @@ def test_active_listen_and_margin(env, monkeypatch):
     assert room.listening("claude") is False
 
 
-def test_duplicate_participants():
+def test_duplicate_participants(open_store):
     with pytest.raises(RoomError):
-        Room([PARTICIPANTS[0], PARTICIPANTS[0]], SqliteStore(":memory:"))
+        Room([PARTICIPANTS[0], PARTICIPANTS[0]], open_store())
 
 
-def test_moderator_resets_hops_and_the_brake_still_applies_between_agents():
+def test_moderator_resets_hops_and_the_brake_still_applies_between_agents(open_store):
     participants = [
         Participant("user", "User", "human"),
         Participant("moderator", "Moderator", "agent", "watch", role="moderator"),
@@ -307,7 +306,7 @@ def test_moderator_resets_hops_and_the_brake_still_applies_between_agents():
         Participant("vista", "AIVista", "agent", "codex_queue"),
     ]
     wakers = {p.id: FakeWaker() for p in participants if p.type == "agent"}
-    room = Room(participants, SqliteStore(":memory:"), wakers=wakers, max_hops=2, clock=Clock())
+    room = Room(participants, open_store(), wakers=wakers, max_hops=2, clock=Clock())
     room.send("user", "@moderator start")
     m = room.send("moderator", "@aegis @vista introduce yourselves")
     assert m.message.hops == 0
@@ -321,14 +320,14 @@ def test_moderator_resets_hops_and_the_brake_still_applies_between_agents():
     assert m2.notified == ("aegis",)
 
 
-def test_moderator_turn_limit_waits_for_the_user():
+def test_moderator_turn_limit_waits_for_the_user(open_store):
     participants = [
         Participant("user", "User", "human"),
         Participant("moderator", "Moderator", "agent", "watch", role="moderator"),
         Participant("aegis", "AEGIS", "agent", "codex_queue"),
     ]
     wakers = {p.id: FakeWaker() for p in participants if p.type == "agent"}
-    room = Room(participants, SqliteStore(":memory:"), wakers=wakers, max_moderator_turns=2, clock=Clock())
+    room = Room(participants, open_store(), wakers=wakers, max_moderator_turns=2, clock=Clock())
     room.send("user", "start")
     m1 = room.send("moderator", "@aegis one")
     a1 = room.send("aegis", "@moderator done")
@@ -351,14 +350,14 @@ def test_moderator_turn_limit_waits_for_the_user():
     assert room.state()["turn_limit_reached"] is False
 
 
-def test_user_message_without_mentions_goes_to_the_moderator():
+def test_user_message_without_mentions_goes_to_the_moderator(open_store):
     participants = [
         Participant("user", "User", "human"),
         Participant("moderator", "Moderator", "agent", "watch", role="moderator"),
         Participant("aegis", "AEGIS", "agent", "codex_queue"),
     ]
     wakers = {p.id: FakeWaker() for p in participants if p.type == "agent"}
-    room = Room(participants, SqliteStore(":memory:"), wakers=wakers, clock=Clock())
+    room = Room(participants, open_store(), wakers=wakers, clock=Clock())
     e = room.send("user", "start phase 0")
     assert e.message.mentions == ("moderator",) and e.notified == ("moderator",)
     assert [m.id for m in room.pending("moderator")] == [e.message.id]
@@ -367,8 +366,8 @@ def test_user_message_without_mentions_goes_to_the_moderator():
     assert room.send("aegis", "no mentions").message.mentions == ()
 
 
-def test_without_moderator_a_message_without_mentions_wakes_nobody():
-    room = Room(PARTICIPANTS, SqliteStore(":memory:"), clock=Clock())
+def test_without_moderator_a_message_without_mentions_wakes_nobody(open_store):
+    room = Room(PARTICIPANTS, open_store(), clock=Clock())
     assert room.send("user", "hello").notified == ()
 
 
@@ -379,9 +378,9 @@ def test_without_moderator_a_message_without_mentions_wakes_nobody():
         Participant("user2", "Other", "human", role="moderator"),
     ],
 )
-def test_invalid_role_is_rejected(participant):
+def test_invalid_role_is_rejected(participant, open_store):
     with pytest.raises(RoomError, match="role"):
-        Room([Participant("user", "User", "human"), participant], SqliteStore(":memory:"))
+        Room([Participant("user", "User", "human"), participant], open_store())
 
 
 # Blind rounds
@@ -395,9 +394,9 @@ ROUND_PARTICIPANTS = [
 
 
 @pytest.fixture
-def debate():
+def debate(open_store):
     wakers = {p.id: FakeWaker() for p in ROUND_PARTICIPANTS if p.type == "agent"}
-    store = SqliteStore(":memory:")
+    store = open_store()
     room = Room(ROUND_PARTICIPANTS, store, [], wakers, clock=Clock())
     return room, wakers, store
 

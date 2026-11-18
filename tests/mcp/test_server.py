@@ -7,7 +7,6 @@ from mcp.server.mcpserver.exceptions import ToolError
 
 from agora.core import Participant, Room
 from agora.mcp import create_server
-from agora.store.sqlite import SqliteStore
 from agora.web import WebChannel, create_app
 
 PARTICIPANTS = [
@@ -34,10 +33,10 @@ def call(mcp, tool, **arguments):
 
 
 @pytest.fixture
-def setup():
+def setup(open_store):
     channel = WebChannel()
     codex = Waker()
-    room = Room(PARTICIPANTS, SqliteStore(":memory:"), [channel], {"codex": codex, "claude": Waker()})
+    room = Room(PARTICIPANTS, open_store(), [channel], {"codex": codex, "claude": Waker()})
     client = TestClient(create_app(room, channel))
     return create_server(client, "claude"), room, codex
 

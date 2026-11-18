@@ -113,6 +113,7 @@ def test_watch_wakes_claude(server):
     finally:
         process.kill()
         process.wait()
+        process.stdout.close()
 
 
 def test_pending_for_hooks(server):
