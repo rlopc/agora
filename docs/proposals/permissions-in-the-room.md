@@ -1,6 +1,6 @@
 # Proposal: answer permission requests from the room
 
-Status: phase 2 (deciding from the room) implemented for Claude Code and Codex; it replaced phase 1 (notice). Antigravity is not covered.
+Status: phase 2 (deciding from the room) implemented for Claude Code, Codex and Antigravity's commands; it replaced phase 1 (notice).
 
 ## Problem
 
@@ -18,7 +18,7 @@ Out of scope: the first-run dialogs (trusting the folder, enabling the MCP serve
 | --- | --- | --- | --- |
 | Claude Code | `PermissionRequest` | Only when it is about to ask for permission (or would auto-deny a call that cannot prompt). | `{"hookSpecificOutput": {"hookEventName": "PermissionRequest", "decision": {"behavior": "allow"}}}`; `deny` takes an optional `message`. |
 | Codex | `PermissionRequest` | Only when it is about to ask for approval (shell escalation, network approval); not for commands that need none. | Same shape. No decision: the normal approval prompt. `updatedInput`, `updatedPermissions` and `interrupt` are rejected. |
-| Antigravity CLI | `PreToolUse` | Before every tool call, not only those that would ask. | `decision`: `allow`, `ask` or `deny`. |
+| Antigravity CLI | `PreToolUse` | Before every tool call, not only those that would ask. | `decision`: `allow` (hands the call to agy's rules), `auto_approve`, `ask`, `force_ask`, `deny` with a `reason`, `deny_unless_prior_grant`. |
 
 Both hooks receive `tool_name` and `tool_input` (Codex adds a human-readable `tool_input.description`). Command hooks may run for up to 600 seconds by default in Claude Code and Codex.
 
@@ -37,7 +37,7 @@ Sources: [Claude Code hooks](https://code.claude.com/docs/en/hooks), [Codex hook
 4. **Room down or stopping.** If the room is not reachable, or stops while the hook waits, the hook prints nothing: the tool asks as today.
 5. **Answered elsewhere.** When the user denies in the terminal or the hook times out, Claude Code kills the hook. Whatever the signal (even `SIGKILL`), the connection closes; the room checks for it while it waits and marks the request `terminal`. When the user allows in the terminal, Claude Code does not stop the hook: the call runs and the hook would keep waiting until its timeout. So `PostToolUse` and `PostToolUseFailure` hooks run `agora-permission --done`, and the room closes that call's pending request and answers its hook with no decision. The hooks share no call id, so the call is matched by session, tool and input (hashed). One race remains: if the user answers in the terminal just as the room answers, the room shows its own decision although the terminal's won.
 6. **Codex.** `approval_policy` goes from `never` to `on-request`, so Codex asks to leave the sandbox instead of failing, and `hooks.json` gets the same `PermissionRequest` hook. Codex does not race: it waits for the hook and shows its prompt only if the hook ends without a decision (the room stops waiting, the room is down, or the hook times out). So a request is never pending when the call runs and Codex needs no hook after the call. Interrupting Codex kills the hook, and the room marks the request `terminal`. If nobody answers in the room, the agent then waits on its terminal prompt, as Claude Code does.
-7. **Antigravity (not covered).** Its `PreToolUse` hook fires on every call, so the room would have to ask for all of them or copy `agy`'s permission rules.
+7. **Antigravity: only its commands.** Its `PreToolUse` hook fires on every call, but agora launches agy in `accept-edits` mode, where every command (`run_command`) asks unless a rule allows it. So a `PreToolUse` hook limited to `run_command` asks the room for what agy would ask in its terminal, without copying agy's rules: allow prints `auto_approve`, deny prints `deny` with a reason, and no decision prints nothing, which hands the call to agy's rules and its prompt. Like Codex it does not race, so it needs no hook after the call. Its timeout must outlast the room's wait (630 s), since on timeout agy fails the call. When the user interrupts agy, it kills only the process it started (`uv run`), not `agora-permission`, so the hook stops waiting as soon as its parent dies. Limits: the hook runs before agy's rules, so the room also asks for commands that a rule of the user's or an «always allow» would let through; and other tools that ask (other MCP servers, the browser) are not covered. Rules for read-only commands, as Claude Code has, can be added later if the room gets too many requests.
 8. **Out of scope.** Only allow and deny: no `deny` message (not verified) and no «always allow» (`permission_suggestions`, which would need `updatedPermissions`).
 
 ## Security
@@ -88,10 +88,23 @@ Codex 0.170.0, `on-request` approval policy, `workspace-write` sandbox, a `Bash`
 | Hook exits 0 with no output, or times out | The normal prompt appears; «Yes» runs the call and `PostToolUse` fires. |
 | The user interrupts Codex (Esc) while the hook waits | The hook process is killed. |
 
+Antigravity CLI 1.5.11, `accept-edits` mode, `run_command`, with a probe hook (2026-11-18):
+
+| Case | Result |
+| --- | --- |
+| Any command, also `ls -la`, with no allow rule | agy asks. `PreToolUse` input: `conversationId`, `cwd`, `toolCall.name`, `toolCall.id` and `toolCall.args` (`CommandLine`, `toolSummary`, …). No hook trust is asked. |
+| Hook prints `auto_approve` | The command runs without a prompt. |
+| Hook prints `deny` with a `reason` | The command does not run; the agent gets «tool call denied by pre-tool hook:» followed by the reason. |
+| Hook waiting (75 s, timeout 700) | The terminal shows «Running command...», not the prompt: there is no race. The timeout is honoured beyond the 30 s default. |
+| Hook exits with no output | agy applies its rules: the prompt appears, or the command runs if a rule (`command(ls)` in `--settings`) allows it. |
+| Hook times out | The call fails; no prompt. |
+| The user interrupts agy (Esc) while the hook waits | The hook process is killed. |
+| The same, with the room's hook (`uv run … agora-permission`) | Only `uv run` is killed: `agora-permission` was left waiting, which is why it watches its parent. |
+
 Still to verify:
 
 - Claude Code: `deny` with a `message` (only documented).
 
 ## Cost
 
-A new command behaviour, an in-memory resource in `core` with four endpoints, a UI panel, the token (in the room and in `agora-start`), a longer hook timeout and two more hooks in the Claude Code generator (one process of about 60 ms after every tool call), with their tests. Codex adds its approval policy and one more hook in its generator.
+A new command behaviour, an in-memory resource in `core` with four endpoints, a UI panel, the token (in the room and in `agora-start`), a longer hook timeout and two more hooks in the Claude Code generator (one process of about 60 ms after every tool call), with their tests. Codex adds its approval policy and one more hook in its generator; Antigravity, one more hook and the translation of its input and output in `agora-permission`.

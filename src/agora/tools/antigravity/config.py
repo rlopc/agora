@@ -5,9 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 
 from agora.agents.config import ResolvedAgent
-from agora.agents.environment import Environment, mcp_server, pending_command
+from agora.agents.environment import Environment, hook_command, mcp_server, pending_command
 from agora.agents.merge import update_json, update_text
 from agora.agents.notes import note
+from agora.core import PERMISSION_WAIT
 
 HOOK = "agora"
 # PreInvocation runs before every model call: the closest thing to a wake, since the room cannot wake agy.
@@ -30,7 +31,17 @@ def generate_antigravity(p: ResolvedAgent, environment: Environment, write: bool
 
     def change_hooks(data: dict) -> None:
         own = {"type": "command", "command": f"{pending_command(p.id, environment)} --inject-steps", "timeout": 10}
-        data[HOOK] = {event: [own] for event in EVENTS}
+        permission = {
+            "type": "command",
+            "command": f"{hook_command('agora-permission', p.id, environment)} --antigravity",
+            # On timeout agy fails the call instead of asking: the hook must outlast the room's wait.
+            "timeout": PERMISSION_WAIT + 30,
+        }
+        # In accept-edits mode agy asks before every command, unless a rule allows it; so does the room.
+        data[HOOK] = {
+            **{event: [own] for event in EVENTS},
+            "PreToolUse": [{"matcher": "run_command", "hooks": [permission]}],
+        }
 
     # Files in `rules/` without a valid trigger are silently ignored.
     text = (

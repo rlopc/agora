@@ -351,7 +351,7 @@ def test_codex_without_thread_with_folder_finds_its_session(tmp_path):
 REQUEST = {"session_id": "s1", "tool_name": "Bash", "tool_input": {"command": "rm -rf build", "description": "Clean"}}
 
 
-def ask_permission(url, *extra):
+def ask_permission(url, *extra, request=REQUEST):
     hook = subprocess.Popen(
         [executable("agora-permission"), "--participant", "claude", "--url", url, *extra],
         stdin=subprocess.PIPE,
@@ -360,7 +360,7 @@ def ask_permission(url, *extra):
         encoding="utf-8",
     )
     assert hook.stdin is not None
-    hook.stdin.write(json.dumps(REQUEST))
+    hook.stdin.write(json.dumps(request))
     hook.stdin.close()
     return hook
 
@@ -386,6 +386,20 @@ def test_permission_answered_in_the_room(server):
     assert httpx.get(f"{url}/api/messages").json() == []  # not a message: it is no hop
 
 
+def test_antigravity_permission_denied_in_the_room(server):
+    url, _ = server
+    request = {"conversationId": "c1", "toolCall": {"name": "run_command", "args": {"CommandLine": "rm -rf build"}}}
+    hook = ask_permission(url, "--antigravity", request=request)
+    assert wait_for(lambda: permissions(url))
+    [item] = permissions(url)
+    assert item["summary"] == "run_command: rm -rf build"
+    port = url.rsplit(":", 1)[1]
+    httpx.post(f"{url}/api/permissions/{item['id']}", json={"allow": False}, cookies={f"agora-{port}": TOKEN})
+    out, _ = hook.communicate(timeout=10)
+    assert hook.returncode == 0
+    assert json.loads(out) == {"decision": "deny", "reason": "Denied by the user in the room."}
+
+
 def test_permission_allowed_in_the_terminal(server):
     """Allowing in the terminal does not stop the hook: the hook after the call closes the request."""
     url, _ = server
@@ -405,6 +419,20 @@ def test_permission_denied_in_the_terminal(server):
     assert wait_for(lambda: permissions(url))
     hook.kill()
     hook.communicate(timeout=5)
+    assert wait_for(lambda: permissions(url)[0]["status"] == "terminal")
+
+
+def test_permission_stops_waiting_when_its_parent_dies(server):
+    """agy kills only the process it started (`uv run`): the hook must not keep waiting."""
+    url, _ = server
+    command = f"{executable('agora-permission')} --participant claude --url {url}; true"  # `; true`: sh does not exec
+    parent = subprocess.Popen(["/bin/sh", "-c", command], stdin=subprocess.PIPE, text=True)
+    assert parent.stdin is not None
+    parent.stdin.write(json.dumps(REQUEST))
+    parent.stdin.close()
+    assert wait_for(lambda: permissions(url))
+    parent.kill()
+    parent.wait(timeout=5)
     assert wait_for(lambda: permissions(url)[0]["status"] == "terminal")
 
 
