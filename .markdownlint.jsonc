@@ -1,4 +1,8 @@
+// markdownlint rules. Which files are checked is set in .markdownlint-cli2.jsonc.
 {
+  // No line length limit: each paragraph is written on one line.
   "MD013": false,
-  "MD041": false,
+  // A file does not have to start with a top-level heading: CLAUDE.md (an
+  // @AGENTS.md import) and the pull request template do not.
+  "MD041": false
 }
