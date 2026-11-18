@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/rlopc/agora/compare/v0.3.0...v0.3.1) (2026-11-18)
+
+
+### Bug Fixes
+
+* **tools:** tell Codex agents to retry outside the sandbox ([#47](https://github.com/rlopc/agora/issues/47)) ([8c268b4](https://github.com/rlopc/agora/commit/8c268b4deaf07ca915f35d05ff306edbaf9bf7d2))
+
 ## [0.3.0](https://github.com/rlopc/agora/compare/v0.2.1...v0.3.0) (2026-11-18)
 
 
