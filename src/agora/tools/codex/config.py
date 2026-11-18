@@ -45,6 +45,8 @@ def own_note(p: ResolvedAgent, environment: Environment) -> list[str]:
     return [
         "- The room wakes you with `codex queue`; handle the wake with `pending()`.",
         f'- Launch your subagents with `agent_type = "{SUBAGENT}"`' + (f" ({detail})." if detail else "."),
+        # Codex only asks for approval when it retries outside the sandbox: without retrying, the room never sees it.
+        "- If a command fails because of the sandbox, retry it asking for approval: the user can answer from the room.",
     ]
 
 
