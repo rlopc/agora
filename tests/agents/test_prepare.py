@@ -30,10 +30,10 @@ folder = "."
 tool = "claude"
 
 [[participants]]
-id = "aegis"
-name = "AEGIS spokesperson"
+id = "alpha"
+name = "Alpha spokesperson"
 type = "agent"
-folder = "aegis"
+folder = "alpha"
 tool = "codex"
 
 """
@@ -41,7 +41,7 @@ tool = "codex"
 
 @pytest.fixture
 def room(tmp_path):
-    (tmp_path / "aegis").mkdir()
+    (tmp_path / "alpha").mkdir()
     path = tmp_path / "agora.toml"
     path.write_text(TEXT.format(homes=tmp_path / "homes"), encoding="utf-8")
     return path
@@ -50,8 +50,8 @@ def room(tmp_path):
 def test_prepares_each_agent_with_its_tool(room, tmp_path):
     main(["--config", str(room)])
     assert (tmp_path / ".mcp.json").is_file() and not (tmp_path / "homes" / "moderator").exists()
-    assert (tmp_path / "homes" / "aegis" / "config.toml").is_file()
-    assert (tmp_path / "aegis" / ".codex" / "hooks.json").is_file()
+    assert (tmp_path / "homes" / "alpha" / "config.toml").is_file()
+    assert (tmp_path / "alpha" / ".codex" / "hooks.json").is_file()
 
 
 def test_agent_without_tool_exits_with_message(tmp_path):
@@ -77,7 +77,7 @@ def test_second_time_up_to_date(room, capsys):
     assert "Codex will ask to trust the hooks again" in output
     main(["--config", str(room)])
     output = capsys.readouterr().out
-    assert "moderator (claude, opus): up to date" in output and "aegis (codex, gpt-5.6-terra): up to date" in output
+    assert "moderator (claude, opus): up to date" in output and "alpha (codex, gpt-5.6-terra): up to date" in output
     assert "trust" not in output
 
 
@@ -86,16 +86,16 @@ def test_prepare_without_writing_lists_what_is_pending(room, tmp_path):
 
     config = tomllib.loads(room.read_text(encoding="utf-8"))
     pending = prepare(config, tmp_path, TOOLS, write=False)
-    assert set(pending) == {"moderator", "aegis"} and all(pending.values())
+    assert set(pending) == {"moderator", "alpha"} and all(pending.values())
     assert not (tmp_path / ".mcp.json").exists()
 
 
 def test_claude_agent_inside_another_folder_is_rejected_without_writing(room, tmp_path):
-    # Claude loads the CLAUDE.md files of parent folders: aegis would read the moderator's role.
+    # Claude loads the CLAUDE.md files of parent folders: alpha would read the moderator's role.
     room.write_text(room.read_text(encoding="utf-8").replace('tool = "codex"', 'tool = "claude"'), encoding="utf-8")
-    with pytest.raises(SystemExit, match=r"aegis.*is inside that of moderator"):
+    with pytest.raises(SystemExit, match=r"alpha.*is inside that of moderator"):
         main(["--config", str(room)])
-    assert not (tmp_path / ".mcp.json").exists() and not (tmp_path / "aegis" / ".mcp.json").exists()
+    assert not (tmp_path / ".mcp.json").exists() and not (tmp_path / "alpha" / ".mcp.json").exists()
 
 
 def test_two_agents_in_the_same_folder_are_rejected(tmp_path):

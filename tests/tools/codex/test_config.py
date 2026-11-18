@@ -11,7 +11,7 @@ from agora.tools.codex.config import generate_codex
 
 
 @pytest.fixture
-def aegis(tmp_path):
+def alpha(tmp_path):
     config = {
         "room": {"port": 8766},
         "tools": {
@@ -22,11 +22,11 @@ def aegis(tmp_path):
                 "homes": str(tmp_path / "homes"),
             }
         },
-        "participants": [{"id": "aegis", "name": "A", "type": "agent", "folder": "aegis", "tool": "codex"}],
+        "participants": [{"id": "alpha", "name": "A", "type": "agent", "folder": "alpha", "tool": "codex"}],
     }
-    (tmp_path / "aegis").mkdir()
+    (tmp_path / "alpha").mkdir()
     [p] = resolve(config, tmp_path, TOOLS)
-    environment = Environment(url="http://127.0.0.1:8766", project=Path("/KnowledgeBase"))
+    environment = Environment(url="http://127.0.0.1:8766", project=Path("/work/room"))
     return p, environment
 
 
@@ -34,8 +34,8 @@ def read(path):
     return tomllib.loads(path.read_text(encoding="utf-8"))
 
 
-def test_generates_full_config(aegis):
-    p, environment = aegis
+def test_generates_full_config(alpha):
+    p, environment = alpha
     changed = generate_codex(p, environment)
     config = p.tool_options.home / "config.toml"
     assert set(changed) == {
@@ -53,19 +53,19 @@ def test_generates_full_config(aegis):
     assert c["projects"][str(p.folder)]["trust_level"] == "trusted"
     room = c["mcp_servers"]["agora"]
     assert room["command"] == "uv"
-    assert room["args"] == ["run", "--quiet", "--frozen", "--project", "/KnowledgeBase", "agora-mcp"]
-    assert room["env"] == {"AGORA_PARTICIPANT": "aegis", "AGORA_URL": "http://127.0.0.1:8766"}
+    assert room["args"] == ["run", "--quiet", "--frozen", "--project", "/work/room", "agora-mcp"]
+    assert room["env"] == {"AGORA_PARTICIPANT": "alpha", "AGORA_URL": "http://127.0.0.1:8766"}
     assert {t: v["approval_mode"] for t, v in room["tools"].items()} == dict.fromkeys(
         ["pending", "send", "mark_read", "history", "close_round"], "approve"
     )
-    assert "`aegis`" in c["developer_instructions"] and 'agent_type = "subagent"' in c["developer_instructions"]
+    assert "`alpha`" in c["developer_instructions"] and 'agent_type = "subagent"' in c["developer_instructions"]
     sub = c["agents"]["subagent"]
     assert sub["config_file"] == str(p.tool_options.home / "agents" / "subagent.toml") and sub["description"]
     assert read(Path(sub["config_file"])) == {"model": "gpt-5.6-terra", "model_reasoning_effort": "medium"}
 
 
-def test_keeps_foreign_content(aegis):
-    p, environment = aegis
+def test_keeps_foreign_content(alpha):
+    p, environment = alpha
     p.tool_options.home.mkdir(parents=True)
     previous = (
         "# user comment\n"
@@ -84,8 +84,8 @@ def test_keeps_foreign_content(aegis):
     assert c["model"] == "gpt-5.6-terra"
 
 
-def test_existing_project_with_another_spelling(aegis):
-    p, environment = aegis
+def test_existing_project_with_another_spelling(alpha):
+    p, environment = alpha
     p.tool_options.home.mkdir(parents=True)
     key = str(p.folder) + "/"
     (p.tool_options.home / "config.toml").write_text(
@@ -95,8 +95,8 @@ def test_existing_project_with_another_spelling(aegis):
     assert list(read(p.tool_options.home / "config.toml")["projects"]) == [key]
 
 
-def test_idempotent(aegis):
-    p, environment = aegis
+def test_idempotent(alpha):
+    p, environment = alpha
     generate_codex(p, environment)
     config = p.tool_options.home / "config.toml"
     before = config.stat().st_mtime_ns
@@ -104,14 +104,14 @@ def test_idempotent(aegis):
     assert config.stat().st_mtime_ns == before
 
 
-def test_write_false_touches_nothing(aegis):
-    p, environment = aegis
+def test_write_false_touches_nothing(alpha):
+    p, environment = alpha
     assert len(generate_codex(p, environment, write=False)) == 3
     assert not p.tool_options.home.exists() and not (p.folder / ".codex").exists()
 
 
-def test_hooks_json(aegis):
-    p, environment = aegis
+def test_hooks_json(alpha):
+    p, environment = alpha
     hooks = p.folder / ".codex" / "hooks.json"
     hooks.parent.mkdir()
     foreign = {"type": "command", "command": "echo hello"}
@@ -122,23 +122,23 @@ def test_hooks_json(aegis):
     commands = [h["command"] for group in data["SessionStart"] for h in group["hooks"]]
     assert commands == [
         "echo hello",
-        "uv run --quiet --frozen --project /KnowledgeBase agora-pending --participant aegis "
+        "uv run --quiet --frozen --project /work/room agora-pending --participant alpha "
         "--url http://127.0.0.1:8766 --json-event SessionStart",
     ]
     assert data["UserPromptSubmit"][0]["hooks"][0]["timeout"] == 10
 
 
-def test_extra_write_dirs_in_writable_roots(aegis, tmp_path):
+def test_extra_write_dirs_in_writable_roots(alpha, tmp_path):
     from dataclasses import replace
 
-    p, environment = aegis
+    p, environment = alpha
     p = replace(p, write_dirs=(tmp_path,))
     generate_codex(p, environment)
     assert read(p.tool_options.home / "config.toml")["sandbox_workspace_write"]["writable_roots"] == [str(tmp_path)]
 
 
-def test_notices_ask_to_log_in_when_the_config_changes(aegis):
-    p, environment = aegis
+def test_notices_ask_to_log_in_when_the_config_changes(alpha):
+    p, environment = alpha
     notices = TOOLS["codex"].notices(p, generate_codex(p, environment))
     assert f"CODEX_HOME={p.tool_options.home} codex login" in notices[0]
     assert "trust the hooks" in notices[1]
@@ -149,23 +149,23 @@ def test_relative_homes_are_relative_to_the_config(tmp_path):
     def home(codex, participant=None):
         config = {
             "tools": {"codex": codex},
-            "participants": [{"id": "Aegis", "name": "A", "type": "agent", "tool": "codex", **(participant or {})}],
+            "participants": [{"id": "Alpha", "name": "A", "type": "agent", "tool": "codex", **(participant or {})}],
         }
         [p] = resolve(config, tmp_path, TOOLS)
         return p.tool_options.home
 
-    assert home({"homes": "homes"}) == tmp_path / "homes" / "aegis"
+    assert home({"homes": "homes"}) == tmp_path / "homes" / "alpha"
     assert home({}, {"codex_home": "mine"}) == tmp_path / "mine"
-    assert home({"homes": "/abs/homes"}) == Path("/abs/homes/aegis")
+    assert home({"homes": "/abs/homes"}) == Path("/abs/homes/alpha")
 
 
 def test_the_subagent_file_exists_without_subagent_settings(tmp_path):
     # Codex ignores the agent role if its config_file does not exist.
     config = {
         "tools": {"codex": {"homes": "homes"}},
-        "participants": [{"id": "aegis", "name": "A", "type": "agent", "tool": "codex"}],
+        "participants": [{"id": "alpha", "name": "A", "type": "agent", "tool": "codex"}],
     }
     [p] = resolve(config, tmp_path, TOOLS)
-    generate_codex(p, Environment(url="http://127.0.0.1:8766", project=Path("/KnowledgeBase")))
+    generate_codex(p, Environment(url="http://127.0.0.1:8766", project=Path("/work/room")))
     assert (p.tool_options.home / "agents" / "subagent.toml").read_text() == ""
-    assert generate_codex(p, Environment(url="http://127.0.0.1:8766", project=Path("/KnowledgeBase"))) == []
+    assert generate_codex(p, Environment(url="http://127.0.0.1:8766", project=Path("/work/room"))) == []

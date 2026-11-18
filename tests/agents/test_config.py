@@ -8,7 +8,7 @@ from agora.agents import resolve as resolve_with
 from agora.tools import TOOLS
 from agora.tools.codex.config import CodexOptions
 
-BASE = Path(r"/Dev/WorkSpace/Aegis_vs_Aivista")
+BASE = Path(r"/work/debate")
 
 NEW_TEXT = r"""
 [room]
@@ -23,7 +23,7 @@ subagents = { model = "sonnet" }
 model = "gpt-5.6-terra"
 effort = "high"
 subagents = { model = "gpt-5.6-terra", effort = "medium" }
-homes = '/Dev/codex-homes'
+homes = '/work/codex-homes'
 
 [[participants]]
 id = "user"
@@ -39,18 +39,18 @@ folder = "."
 tool = "claude"
 
 [[participants]]
-id = "aegis"
-name = "AEGIS spokesperson"
+id = "alpha"
+name = "Alpha spokesperson"
 type = "agent"
-folder = "aegis"
+folder = "alpha"
 tool = "codex"
 codex_thread = ""
 
 [[participants]]
-id = "vista"
-name = "AIVista spokesperson"
+id = "beta"
+name = "Beta spokesperson"
 type = "agent"
-folder = "vista"
+folder = "beta"
 tool = "codex"
 
 """
@@ -74,13 +74,13 @@ def test_defaults_use_what_is_declared():
         BASE,
         "concierge",
     )
-    assert by_id(resolve(NEW, BASE))["aegis"].folder == BASE / "aegis"
+    assert by_id(resolve(NEW, BASE))["alpha"].folder == BASE / "alpha"
 
 
 def test_codex_takes_what_is_missing_from_its_tool():
-    a = by_id(resolve(NEW, BASE))["aegis"]
+    a = by_id(resolve(NEW, BASE))["alpha"]
     assert (a.model, a.effort, a.subagents) == ("gpt-5.6-terra", "high", Subagents("gpt-5.6-terra", "medium"))
-    assert a.tool_options == CodexOptions(Path(r"/Dev/codex-homes/aegis")) and a.waker == "codex_queue"
+    assert a.tool_options == CodexOptions(Path(r"/work/codex-homes/alpha")) and a.waker == "codex_queue"
 
 
 def test_human_without_tool():
@@ -98,13 +98,13 @@ def test_to_participant_does_not_leak_the_agent_model():
     r = by_id(resolve(NEW, BASE))
     m = to_participant(r["moderator"])
     assert m.waker == "concierge" and m.options == {} and m.role == "moderator"
-    assert to_participant(r["aegis"]).options == {"codex_thread": ""}
+    assert to_participant(r["alpha"]).options == {"codex_thread": ""}
 
 
 def test_explicit_codex_home_is_a_tool_option():
-    config = tomllib.loads(NEW_TEXT.replace('codex_thread = ""', 'codex_thread = ""\ncodex_home = "/Other/aegis"'))
-    a = by_id(resolve(config, BASE))["aegis"]
-    assert a.tool_options == CodexOptions(Path("/Other/aegis")) and "codex_home" not in a.options
+    config = tomllib.loads(NEW_TEXT.replace('codex_thread = ""', 'codex_thread = ""\ncodex_home = "/Other/alpha"'))
+    a = by_id(resolve(config, BASE))["alpha"]
+    assert a.tool_options == CodexOptions(Path("/Other/alpha")) and "codex_home" not in a.options
 
 
 def test_concierge_model_goes_to_options():
@@ -116,8 +116,8 @@ def test_concierge_model_goes_to_options():
 @pytest.mark.parametrize(
     "change,message",
     [
-        ('tool = "gemini"\ncodex_thread', "unknown tool for aegis: gemini. Valid: antigravity, claude, codex"),
-        ("codex_thread", "aegis does not declare `tool`. Valid: antigravity, claude, codex"),
+        ('tool = "gemini"\ncodex_thread', "unknown tool for alpha: gemini. Valid: antigravity, claude, codex"),
+        ("codex_thread", "alpha does not declare `tool`. Valid: antigravity, claude, codex"),
     ],
 )
 def test_invalid_tool(change, message):
@@ -130,11 +130,11 @@ def test_read_and_write_dirs_relative_to_the_room():
     config = tomllib.loads(
         NEW_TEXT.replace(
             'folder = "."\ntool = "claude"\n',
-            'folder = "moderator"\ntool = "claude"\nwrite_dirs = ["."]\nread_dirs = [\'/Dev/Other\']\n',
+            'folder = "moderator"\ntool = "claude"\nwrite_dirs = ["."]\nread_dirs = [\'/work/Other\']\n',
             1,
         )
     )
     m = by_id(resolve(config, BASE))["moderator"]
     assert m.folder == BASE / "moderator"
-    assert m.write_dirs == (BASE,) and m.read_dirs == (Path(r"/Dev/Other"),)
+    assert m.write_dirs == (BASE,) and m.read_dirs == (Path(r"/work/Other"),)
     assert "write_dirs" not in to_participant(m).options
