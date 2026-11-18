@@ -40,8 +40,11 @@ def describe(request: Mapping[str, Any]) -> str:
 
 
 def key(request: Mapping[str, Any]) -> str:
-    """The same tool call in the session, as both hooks see it: they share no call id."""
-    call = [request.get("session_id"), request.get("tool_name"), request.get("tool_input")]
+    """The same tool call in the session, as both hooks see it: they share no call id.
+
+    A subagent's calls carry the session's id, so `agent_id` (absent for the main agent) tells them apart.
+    """
+    call = [request.get("session_id"), request.get("agent_id"), request.get("tool_name"), request.get("tool_input")]
     return hashlib.sha256(json.dumps(call, sort_keys=True).encode()).hexdigest()
 
 

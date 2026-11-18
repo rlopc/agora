@@ -29,4 +29,5 @@ def test_key_is_the_same_for_the_request_and_the_hooks_after_the_call():
     after = {**call, "hook_event_name": "PostToolUse", "tool_use_id": "toolu_1", "tool_response": {}}
     assert key({**call, "hook_event_name": "PermissionRequest"}) == key(after)
     assert key(call) != key({**call, "session_id": "s2"})
+    assert key(call) != key({**call, "agent_id": "a1"})
     assert key(call) != key({**call, "tool_input": {"command": "make clean"}})
