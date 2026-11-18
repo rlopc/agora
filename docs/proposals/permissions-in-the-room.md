@@ -22,7 +22,7 @@ Out of scope: the first-run dialogs (trusting the folder, enabling the MCP serve
 
 Both hooks receive `tool_name` and `tool_input` (Codex adds a human-readable `tool_input.description`). Command hooks may run for up to 600 seconds by default in Claude Code and Codex.
 
-Sources: [Claude Code hooks](https://code.claude.com/docs/en/hooks), [Codex hooks](https://developers.openai.com/codex/hooks), [Antigravity hooks](https://antigravity.google/docs/hooks).
+Sources: [Claude Code hooks](https://code.claude.com/docs/en/hooks), [Codex hooks](https://learn.chatgpt.com/docs/hooks), [Antigravity hooks](https://antigravity.google/docs/hooks).
 
 ## Phases
 
