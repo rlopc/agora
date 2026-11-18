@@ -67,7 +67,7 @@ ignore = [
 # codespell skips them even when pre-commit passes them by name.
 check-hidden = true
 # Lockfiles and the changelog are generated; the rest are untracked: caches, local data and notes.
-skip = "uv.lock,mise.lock,CHANGELOG.md,./.git,./.venv,./.pytest_cache,./.ruff_cache,./.import_linter_cache,./data,./sample,*.local.*"
+skip = "uv.lock,mise.lock,.mise/locks/*,./.mise/locks,CHANGELOG.md,./.git,./.venv,./.pytest_cache,./.ruff_cache,./.import_linter_cache,./data,./sample,*.local.*"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
