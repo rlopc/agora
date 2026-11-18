@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import io
 import os
+import secrets
 import shutil
 import subprocess
 import sys
@@ -98,14 +99,19 @@ def main_start(argv: Sequence[str] | None = None) -> None:
     except ConfigError as exc:
         raise SystemExit(f"invalid agora.toml: {exc}") from None
     uv = ["uv", "run", "--project", str(environment.project)]
-    open_window("agora", [*uv, "agora", "--config", str(path)], base)
+    # Generated here so the link can be printed below: the room's own log is in its tmux window.
+    token = secrets.token_urlsafe(24)
+    open_window("agora", ["env", f"AGORA_TOKEN={token}", *uv, "agora", "--config", str(path)], base)
     if not wait_for_room(environment.url):
         raise SystemExit(
             f"The room is not answering at {environment.url}: check its window (tmux attach -t agora) before opening the agents."
         )
     for p in found:
         open_window(p.id, [*uv, "agora-launch", "--config", str(path), p.id], p.folder)
-    print(f"Room at {environment.url}; agents: {', '.join(p.id for p in found)}. Open them with: tmux attach -t agora")
+    print(f"Room at {environment.url}/?token={token}; agents: {', '.join(p.id for p in found)}.")
+    print(
+        "Open the room with that link to answer permission requests from the page; open the agents with: tmux attach -t agora"
+    )
     print(first_run_notice(found))
 
 

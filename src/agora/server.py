@@ -6,6 +6,7 @@ import argparse
 import contextlib
 import logging
 import os
+import secrets
 import socket
 import tomllib
 from collections.abc import Callable, Mapping, Sequence
@@ -39,6 +40,8 @@ class Server:
     on_stop: Callable[[], None] = lambda: None
     # Participants that cannot be woken yet, to log when starting.
     warnings: tuple[str, ...] = ()
+    # Lets the page answer permission requests; only the link printed at startup carries it.
+    token: str = ""
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -114,13 +117,15 @@ def build(
     host = settings.get("host", "127.0.0.1")
     port = int(settings.get("port", 8765))
     hosts = sorted({host, "127.0.0.1", "localhost"})
-    app = create_app(room, channel, hosts=hosts, origins=[f"http://{h}:{port}" for h in hosts])
+    # `agora-start` passes its own, so it can print the link: the room runs in a tmux window.
+    token = env.get("AGORA_TOKEN") or secrets.token_urlsafe(24)
+    app = create_app(room, channel, hosts=hosts, origins=[f"http://{h}:{port}" for h in hosts], token=token)
 
     def close() -> None:
         threads.shutdown(wait=True, cancel_futures=False)
         store.close()
 
-    return Server(room, app, host, port, close, on_stop=channel.close, warnings=warnings)
+    return Server(room, app, host, port, close, on_stop=channel.close, warnings=warnings, token=token)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
@@ -163,7 +168,7 @@ def main(argv: Sequence[str] | None = None) -> None:
             raise SystemExit(
                 f"Port {server.port} is already in use: is another room open at http://{server.host}:{server.port}?"
             ) from None
-    log.info("Room at http://%s:%d", server.host, server.port)
+    log.info("Room at http://%s:%d/?token=%s", server.host, server.port, server.token)
     try:
         config = uvicorn.Config(
             server.app, host=server.host, port=server.port, log_level="warning", timeout_graceful_shutdown=2

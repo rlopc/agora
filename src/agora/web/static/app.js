@@ -7,6 +7,10 @@ const state = {
   replyTo: null,
   paused: false,
   unseen: 0,
+  permissions: new Map(),
+  canDecide: false,
+  // Browser notifications of pending permission requests, closed when they are answered.
+  permissionAlerts: new Map(),
 };
 
 const $ = (id) => document.getElementById(id);
@@ -94,6 +98,98 @@ function alertMention(m) {
     $(`m${m.id}`)?.scrollIntoView({ block: "center" });
     shown.close();
   });
+}
+
+const OUTCOMES = {
+  allowed: "allowed in the room",
+  denied: "denied in the room",
+  terminal: "answered in the terminal",
+};
+
+/** Notification for a new request while the page is not in front; closed once it is answered. */
+function alertPermission(p) {
+  if (p.status !== "pending") {
+    state.permissionAlerts.get(p.id)?.close();
+    state.permissionAlerts.delete(p.id);
+    return;
+  }
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  if (document.visibilityState === "visible" && document.hasFocus()) return;
+  const shown = new Notification(`@${p.participant} asks for permission`, { body: p.summary, tag: `agora-p${p.id}` });
+  shown.addEventListener("click", () => {
+    window.focus();
+    shown.close();
+  });
+  state.permissionAlerts.set(p.id, shown);
+}
+
+function permissionItem(p) {
+  const li = document.createElement("li");
+  li.className = `permission ${p.status}`;
+  const who = document.createElement("span");
+  who.className = "author";
+  who.style.color = colorOf(p.participant);
+  who.textContent = `@${p.participant}`;
+  const what = document.createElement("code");
+  what.textContent = p.summary;
+  const when = document.createElement("span");
+  when.className = "when";
+  when.textContent = p.status === "pending" ? time(p.created) : `${OUTCOMES[p.status]} · ${time(p.answered)}`;
+  li.append(who, what, when);
+  if (p.status === "pending" && state.canDecide) {
+    for (const [label, allow] of [["Allow", true], ["Deny", false]]) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = allow ? "button mini primary" : "button mini";
+      button.textContent = label;
+      button.addEventListener("click", () => decide(p.id, allow));
+      li.append(button);
+    }
+  }
+  return li;
+}
+
+function renderPermissions() {
+  const all = [...state.permissions.values()].sort((a, b) => a.id - b.id);
+  const pending = all.filter((p) => p.status === "pending");
+  const answered = all.filter((p) => p.status !== "pending").reverse();
+  $("permissions").hidden = !all.length;
+  $("permissions-pending").replaceChildren(...pending.map(permissionItem));
+  $("permissions-hint").hidden = !pending.length || state.canDecide;
+  $("permissions-answered").hidden = !answered.length;
+  $("permissions-answered-title").textContent = count(answered.length, "answered permission request");
+  $("permissions-answered-list").replaceChildren(...answered.map(permissionItem));
+}
+
+function updatePermission(p, { alert = false } = {}) {
+  const known = state.permissions.get(p.id);
+  state.permissions.set(p.id, p);
+  if (alert && known?.status !== p.status) alertPermission(p);
+  renderPermissions();
+}
+
+async function loadPermissions() {
+  const r = await api("/api/permissions");
+  state.canDecide = r.can_decide;
+  const ids = new Set(r.permissions.map((p) => p.id));
+  // What the room no longer keeps (answered long ago, or before a restart) is dropped.
+  for (const id of [...state.permissions.keys()]) {
+    if (!ids.has(id)) {
+      alertPermission({ id, status: "terminal" });
+      state.permissions.delete(id);
+    }
+  }
+  r.permissions.forEach((p) => updatePermission(p, { alert: true }));
+  renderPermissions();
+}
+
+async function decide(id, allow) {
+  try {
+    updatePermission(await api(`/api/permissions/${id}`, { method: "POST", body: JSON.stringify({ allow }) }));
+  } catch (e) {
+    notify(`Could not answer the permission request: ${e.message}`);
+    loadPermissions().catch(() => {});
+  }
 }
 
 function renderMessage(m, { highlight = false, alert = false } = {}) {
@@ -319,6 +415,7 @@ async function catchUp() {
   const fresh = await api(`/api/messages?since=${state.lastId}&limit=1000`);
   fresh.forEach((m) => renderMessage(m, { alert: true }));
   renderState(await api("/api/state"));
+  await loadPermissions();
 }
 
 function connect() {
@@ -332,6 +429,7 @@ function connect() {
   });
   source.addEventListener("message", (e) => renderMessage(JSON.parse(e.data), { highlight: true, alert: true }));
   source.addEventListener("state", (e) => renderState(JSON.parse(e.data)));
+  source.addEventListener("permission", (e) => updatePermission(JSON.parse(e.data), { alert: true }));
   source.addEventListener("round", () => notify("Blind round closed: every answer is visible now", "info"));
   source.addEventListener("wake", (e) => {
     const w = JSON.parse(e.data);
@@ -346,6 +444,7 @@ async function start() {
   const history = await api("/api/history?limit=200");
   history.forEach((m) => renderMessage(m));
   renderState(await api("/api/state"));
+  await loadPermissions();
   connect();
 }
 

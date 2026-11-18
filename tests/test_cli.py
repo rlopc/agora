@@ -64,9 +64,13 @@ def test_start_opens_room_and_agents_in_order(monkeypatch, tmp_path, capsys):
     cli.main_start(["--config", str(path)])
     assert [t for t, _ in opened] == ["agora", "moderator", "aegis", "vista"]
     assert opened[0][1][-3:] == ["agora", "--config", str(path)]
+    env, variable = opened[0][1][:2]
+    token = variable.removeprefix("AGORA_TOKEN=")
+    assert env == "env" and len(token) >= 32
     assert opened[2][1][-4:] == ["agora-launch", "--config", str(path), "aegis"]
     assert (tmp_path / "homes" / "aegis" / "config.toml").is_file()  # prepared before opening
     out = capsys.readouterr().out
+    assert f"Room at http://127.0.0.1:8766/?token={token};" in out
     assert "- claude (moderator): trust the folder" in out
     assert "- codex (aegis, vista): trust the hooks" in out
 

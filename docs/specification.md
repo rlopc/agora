@@ -36,7 +36,7 @@ The package `agora` (in `src/`) has these layers; `import-linter` enforces them:
 
 | Module | Responsibility |
 | --- | --- |
-| `core` | Participants, messages, mentions, hops, pause, pending messages, batching and retries. Imports nothing else from `agora`. |
+| `core` | Participants, messages, mentions, hops, pause, pending messages, batching, retries and permission requests. Imports nothing else from `agora`. |
 | `store` | SQLite store (WAL) for messages, mentions, reads, wakes and state. Depends only on `core`. |
 | `web` | Web UI, HTTP API and server-sent events. Depends only on `core`. |
 | `mcp` | Thin stdio MCP server: an HTTP client of the API, with no access to the store or the wakers. |
@@ -185,21 +185,21 @@ All commands accept `--config` (default `agora.toml`) where it applies.
 
 | Command | What it does | Files it writes |
 | --- | --- | --- |
-| `uv run agora [--host H] [--port P]` | Starts the room (API and UI). Refuses to start if the port is in use. | The SQLite database. |
+| `uv run agora [--host H] [--port P]` | Starts the room (API and UI) and prints its link with the token that lets the page answer permission requests (`AGORA_TOKEN`, or a new one each start). Refuses to start if the port is in use. | The SQLite database. |
 | `uv run agora-prepare` | Checks the folders and generates each agent's integration. Warns if a running room still uses the previous configuration. | See below. |
 | `uv run agora-launch ID` | Regenerates the agent's configuration if it is out of date and opens its tool in its folder, with its model. | Same as `agora-prepare`, for that agent. |
-| `uv run agora-start` | Refuses an already running room, prepares, opens the room and then each agent in its own window of the `agora` tmux session (`tmux attach -t agora`), and lists what each tool asks the first time in a folder. | Same as `agora-prepare`. |
+| `uv run agora-start` | Refuses an already running room, prepares, opens the room and then each agent in its own window of the `agora` tmux session (`tmux attach -t agora`), prints the room's link with its token and lists what each tool asks the first time in a folder. | Same as `agora-prepare`. |
 | `uv run agora-archive` | Refuses a running room, copies its database to `archive/<name>-YYYYMMDD-HHMMSS.db` next to it (`data/archive/` by default) and deletes it, so the room starts empty next time. To read an archive, open it with `sqlite3` or start a room whose `db` points to it. | The archived copy. |
 | `uv run agora-mcp --participant ID [--url URL]` | Serves the MCP over stdio; also reads `AGORA_PARTICIPANT` and `AGORA_URL`. Tools run it; you do not. | None. |
 | `uv run agora-watch --participant ID` | Long-polls and prints one line per message when the room wakes the participant. | None. |
 | `uv run agora-pending --participant ID` | For hooks: prints the pending messages, or nothing (also if the room is down). `--json-event EVENT` and `--inject-steps` print the JSON that Codex/Claude and Antigravity hooks expect. | None. |
-| `uv run agora-permission --participant ID` | For `PermissionRequest` hooks: reads the request from stdin and posts to the room, mentioning the user, that the agent is waiting for permission and for what. It prints nothing, so the tool's own prompt stays; it does nothing if the room is down. | None. |
+| `uv run agora-permission --participant ID` | For `PermissionRequest` hooks: reads the request from stdin, shows it in the room and waits for the user to allow or deny it there, while the tool's own prompt stays open in the terminal. It prints the decision if the room answers first, and nothing if the terminal does, the wait ends or the room is down. With `--done`, for `PostToolUse` and `PostToolUseFailure` hooks, it tells the room that the call ran, so a request allowed in the terminal stops waiting. | None. |
 
 What `agora-prepare` generates for each tool:
 
 | Tool | Files | Notes |
 | --- | --- | --- |
-| Claude Code | `<folder>/.mcp.json`, `<folder>/.claude/settings.json` and the section of `<folder>/CLAUDE.md` between `<!-- agora-prepare: start -->` and `<!-- agora-prepare: end -->` | Hooks on `SessionStart` and `UserPromptSubmit`, and on `PermissionRequest` to tell the room when the agent waits for permission. Inside the room's project, paths use `${CLAUDE_PROJECT_DIR}` so the files can be versioned. Claude Code asks to approve `.mcp.json` when the session opens. |
+| Claude Code | `<folder>/.mcp.json`, `<folder>/.claude/settings.json` and the section of `<folder>/CLAUDE.md` between `<!-- agora-prepare: start -->` and `<!-- agora-prepare: end -->` | Hooks on `SessionStart` and `UserPromptSubmit`, on `PermissionRequest` (600-second timeout) so the permission request can be answered from the room, and on `PostToolUse` and `PostToolUseFailure` to close it when it was allowed in the terminal. Inside the room's project, paths use `${CLAUDE_PROJECT_DIR}` so the files can be versioned. Claude Code asks to approve `.mcp.json` when the session opens. |
 | Codex | `CODEX_HOME/config.toml`, `CODEX_HOME/agents/subagent.toml` and `<folder>/.codex/hooks.json` | Hooks on `SessionStart` and `UserPromptSubmit`. The agent's note goes in `developer_instructions`. Codex asks to trust the hooks again whenever `hooks.json` changes. |
 | Antigravity CLI | `<folder>/.agents/mcp_config.json`, `<folder>/.agents/hooks.json` and `<folder>/.agents/rules/agora.md` | Hooks on `SessionStart` and `PreInvocation`. The rule is always applied (`trigger: always_on`). `agy` asks to trust the folder the first time. |
 
@@ -221,7 +221,9 @@ Each agent signs in with its own tool:
 
 ## Web API and MCP
 
-The UI is served at `/`. It shows the thread, lets you reply to a message, pause and resume wakes, see who is listening and wake an agent manually after a failed wake. After you allow notifications (button shown until the browser has asked), a message that mentions you raises a browser notification while the page is hidden or out of focus; clicking it brings the page to that message.
+The UI is served at `/`. It shows the thread, lets you reply to a message, pause and resume wakes, see who is listening and wake an agent manually after a failed wake. After you allow notifications (button shown until the browser has asked), a message that mentions you or a permission request raises a browser notification while the page is hidden or out of focus; clicking it brings the page to front.
+
+Above the thread, the UI lists the agents' pending permission requests, with «Allow» and «Deny», and the last 20 answered, with where they were answered. The tool's prompt stays open in the agent's terminal meanwhile: whichever answers first wins. They live in memory only and are not messages, so they count as no hop. The buttons appear only on a page opened with the link the room prints when it starts (`/?token=…`), which leaves the token in an `HttpOnly` cookie and redirects to `/`; after a restart, open the new link.
 
 | Endpoint | Purpose |
 | --- | --- |
@@ -234,7 +236,11 @@ The UI is served at `/`. It shows the thread, lets you reply to a message, pause
 | `GET /api/state` | Pause, hops, moderator turns, the open blind round (who answered and who is awaited), and each participant's pending count, last wake and error. |
 | `POST /api/pause` | Pause or resume wakes. |
 | `POST /api/wake/{participant}` | Manual wake. |
-| `GET /api/events` | Server-sent events (`message`, `wake`, `state`, `round` when a blind round closes). |
+| `POST /api/permissions` | For the hook: shows a permission request (`participant`, `summary`) and waits on the same connection, up to 600 s, for `{"decision": "allow" \| "deny" \| null}`. If the connection closes first, the request counts as answered in the terminal. `key` identifies the tool call (session, tool and input). |
+| `POST /api/permissions/done` | For the hooks after a tool call (`participant`, `key`): closes that call's pending request as answered in the terminal. |
+| `GET /api/permissions` | Pending and recently answered requests, and `can_decide`: whether this browser holds the token. |
+| `POST /api/permissions/{id}` | Allow or deny (`allow`); needs the token cookie (403 without it, 409 if already answered). |
+| `GET /api/events` | Server-sent events (`message`, `wake`, `state`, `round` when a blind round closes, `permission` when a request is made or answered). |
 
 The MCP server `agora` offers these tools, identifying the agent with `AGORA_PARTICIPANT`:
 
@@ -249,8 +255,10 @@ A session that was already open must be restarted to load the MCP.
 ## Permissions, security and known limits
 
 - The API only accepts the hosts `127.0.0.1`, `localhost` and the configured host, as protection against DNS rebinding.
-- A request with an `Origin` header is accepted only from the room's own page (`http://<host>:<port>` for those hosts), so another web page open in the browser cannot post or wake agents. Requests without `Origin` (agents, commands) are not rejected for it; any local process can still use the API.
-- **Claude Code** is allowed the `agora` MCP tools and a fixed list of read-only commands (`ls`, `cat`, `head`, `wc`, `rg`, `git log/show/status`). `read_dirs` and `write_dirs` both become `additionalDirectories`, which does not distinguish reading from writing. Agora adds no `deny` rules, but keeps any already in `settings.json`. Other permission prompts are answered in the agent's terminal; the room only says which agent is waiting and for what. That notice is an agent message, so it counts as a hop.
+- A request with an `Origin` header is accepted only from the room's own page (`http://<host>:<port>` for those hosts), so another web page open in the browser cannot post or wake agents. Requests without `Origin` (agents, commands) are not rejected for it; any local process can still use the API, except to answer permission requests.
+- Answering a permission request needs the token the room prints when it starts, so an agent cannot approve its own request by calling the API, by mistake or through a prompt injection. The token is written to no file and served in no page. It does not stop a process of the same user that goes looking for it: in the room's tmux window, in the room's command line or environment (`agora-start` passes it with `env`), or in the browser's cookies.
+- If the user answers in the terminal just as the room answers, the hook may be killed before reading the room's decision: the UI then says it was answered in the room, though the terminal decided.
+- **Claude Code** is allowed the `agora` MCP tools and a fixed list of read-only commands (`ls`, `cat`, `head`, `wc`, `rg`, `git log/show/status`). `read_dirs` and `write_dirs` both become `additionalDirectories`, which does not distinguish reading from writing. Agora adds no `deny` rules, but keeps any already in `settings.json`. Other permission prompts can be answered in the agent's terminal or from the room (see [Web API and MCP](#web-api-and-mcp)); the room offers only allow and deny, not «always allow».
 - **Codex** runs with `sandbox_mode = "workspace-write"` and `approval_policy = "never"`: nobody watches the console, so an operation outside the sandbox fails instead of asking. `write_dirs` become `writable_roots`; `read_dirs` add nothing to Codex's configuration.
 - **Antigravity CLI** runs in `accept-edits` mode: edits are accepted and commands ask for approval in its terminal. `read_dirs` and `write_dirs` are added with `--add-dir`.
 - A blind round hides the answers from agents that use the room as intended, not from one that looks for them: the database file (inside an agent's folder if `db` is), `GET /api/history` without `participant` and `/api/events` show everything. Keep `db` outside the agents' folders.

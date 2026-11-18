@@ -60,7 +60,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101"]
+"tests/**" = ["S101", "S105", "S106"]  # assert, and the fake tokens of the tests
 
 [tool.codespell]
 # Hidden files are tracked too (.github/, .pre-commit-config.yaml); without this,

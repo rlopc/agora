@@ -52,8 +52,12 @@ def test_generates_mcp_settings_and_claude_md(moderator, tmp_path):
     for event in ("SessionStart", "UserPromptSubmit"):
         assert settings["hooks"][event] == [{"hooks": [{"type": "command", "command": COMMAND, "timeout": 10}]}]
     assert settings["hooks"]["PermissionRequest"] == [
-        {"hooks": [{"type": "command", "command": PERMISSION, "timeout": 10}]}
+        {"hooks": [{"type": "command", "command": PERMISSION, "timeout": 600}]}
     ]
+    for event in ("PostToolUse", "PostToolUseFailure"):
+        assert settings["hooks"][event] == [
+            {"hooks": [{"type": "command", "command": f"{PERMISSION} --done", "timeout": 10}]}
+        ]
     assert settings["permissions"]["allow"] == ["mcp__agora", *READ_ONLY]
     assert all(not r.startswith("Bash(rm") for r in READ_ONLY)
     assert settings["permissions"]["additionalDirectories"] == [r"/Dev/WorkSpace/AegisWS"]
