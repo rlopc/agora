@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.3.0](https://github.com/rlopc/agora/compare/v0.2.1...v0.3.0) (2026-11-18)
+
+
+### Features
+
+* **tools:** answer Antigravity's command approvals from the room ([#45](https://github.com/rlopc/agora/issues/45)) ([386fa64](https://github.com/rlopc/agora/commit/386fa6422cbdc3eccef28791160b324e47610f0b))
+* **tools:** answer Codex's permission requests from the room ([#43](https://github.com/rlopc/agora/issues/43)) ([2a92531](https://github.com/rlopc/agora/commit/2a92531c9eafe89aa64a8e9bd7a41dd072ba9c4c))
+* **tools:** let the room wake Antigravity through its Stop hook ([#46](https://github.com/rlopc/agora/issues/46)) ([37a4848](https://github.com/rlopc/agora/commit/37a4848c3b5aeef4bfdc9c248bf5ba7520c42c09))
+
 ## [0.2.1](https://github.com/rlopc/agora/compare/v0.2.0...v0.2.1) (2026-11-18)
 
 
