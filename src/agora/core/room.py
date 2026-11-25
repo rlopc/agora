@@ -112,7 +112,7 @@ class Room:
             mentions = tuple(p.id for p in self.participants.values() if p.role == "moderator")
         round_participants = self._check_opening(participant, mentions, round) if blind else []
         last = self.store.last_message()
-        hops = 0 if participant.type == "human" or participant.role == "moderator" else (last.hops if last else 0) + 1
+        hops = 0 if participant.type == "human" or participant.role == "moderator" else self._chain_hops(author, last)
         # The moderator resets the hops, so its own messages since the user's last one are counted apart.
         turns = (
             0
@@ -323,6 +323,14 @@ class Room:
             return True
         # Batching: if there is already a wake after their last activity, it is not repeated.
         return wake.last_activity is not None and wake.last_activity >= wake.last_wake
+
+    def _chain_hops(self, author: str, last: Message | None) -> int:
+        """One more than the messages that led to this one: those addressed to the author since its last message
+        or, if there are none, the last message in the room. Parallel answers to one message do not add up."""
+        received = self.store.chain_hops(author)
+        if received is None:
+            received = last.hops if last else 0
+        return received + 1
 
     def _over_limit(self, message: Message) -> bool:
         """Stored but wakes nobody: the room waits for the user."""

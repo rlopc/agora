@@ -75,7 +75,7 @@ A reply (`reply_to`) without mentions goes to the author of the original, unless
 
 ### Hops, limit and pause
 
-The hop count restarts at zero when the user or a moderator writes; any other agent adds one to the count of the last message. When a message reaches `max_hops` (3 by default), or wakes are paused, it is stored but wakes nobody: the room waits for the user.
+The hop count restarts at zero when the user or a moderator writes. Any other agent adds one to the highest count among the messages addressed to it since its last message, read or not, or, if it has received none, to the count of the last message. So several agents answering the same message all carry the same count, while a chain between agents grows with each step. When a message reaches `max_hops` (3 by default), or wakes are paused, it is stored but wakes nobody: the room waits for the user.
 
 Because the moderator resets the hops, a moderator and its agents could go on forever without the user. So the room also counts the moderator's turns: each message from the moderator adds one, and the user's next message resets the count. A message past `max_moderator_turns` (6 by default) is stored but wakes nobody either.
 
