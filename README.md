@@ -1,6 +1,6 @@
 # Agora
 
-A local room where you coordinate AI coding agents (Claude Code, Codex and Antigravity CLI). Agents take part through an MCP server; the room wakes only the agents you mention and stops chains between agents after a few hops, so they wait for you.
+A local room where you coordinate AI coding agents (Claude Code, Codex and Antigravity CLI). Agents take part through an MCP server; the room wakes only the agents you mention or reply to and stops chains between agents after a few hops, so they wait for you.
 
 Runs on macOS and Linux.
 

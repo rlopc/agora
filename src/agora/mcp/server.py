@@ -20,7 +20,7 @@ DEFAULT_URL = "http://127.0.0.1:8765"
 INSTRUCTIONS = """\
 Room shared with the user and other agents to agree on what to do and how.
 - If a hook or notice says there are pending messages, handle them with pending().
-- Reply with send(text, reply_to). Mention with @id only whoever must act: each mention wakes an agent and costs tokens.
+- Reply with send(text, reply_to): the reply reaches the author of the original. Mention with @id only whoever else must act: each mention wakes an agent and costs tokens.
 - Short messages (≤ 15 lines): cite paths and lines (file.md:40-60) instead of copying content.
 - Bring your own perspective; do not repeat what someone else already said.
 - Weigh arguments, not authors: state agreements and disagreements with reasons and do not agree out of courtesy.
@@ -64,7 +64,7 @@ def create_server(client: httpx.Client, participant: str) -> MCPServer:
 
     @mcp.tool(structured_output=False)
     def send(text: str, reply_to: int | None = None, blind: bool = False) -> str:
-        """Posts a message to the room. Mention recipients with @id; `reply_to` marks the original as read.
+        """Posts a message to the room. Mention recipients with @id; `reply_to` marks the original as read and, without mentions, sends the reply to its author.
 
         `blind` (user or moderator only) opens a blind round with the mentioned agents: none sees the
         others' answers until all of them have replied.
