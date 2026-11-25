@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/rlopc/agora/compare/v0.4.0...v0.4.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* **core:** count hops along the chain, not the arrival order ([#54](https://github.com/rlopc/agora/issues/54)) ([9cf05e5](https://github.com/rlopc/agora/commit/9cf05e566dc68574326a4f63066a9b769d85076f))
+
 ## [0.4.0](https://github.com/rlopc/agora/compare/v0.3.1...v0.4.0) (2026-11-25)
 
 
