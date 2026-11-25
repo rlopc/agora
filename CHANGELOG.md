@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/rlopc/agora/compare/v0.3.1...v0.4.0) (2026-11-25)
+
+
+### Features
+
+* **core:** send a reply without mentions to the author of the original ([#52](https://github.com/rlopc/agora/issues/52)) ([44416e2](https://github.com/rlopc/agora/commit/44416e2e7997f54ae17d3b616aea780757cfb869))
+
 ## [0.3.1](https://github.com/rlopc/agora/compare/v0.3.0...v0.3.1) (2026-11-18)
 
 
