@@ -40,6 +40,10 @@ class Store(Protocol):
         """Messages that mention `participant`, by another author, not read by them and with id > since."""
         ...
 
+    def chain_hops(self, participant: str) -> int | None:
+        """Highest hop count of the messages to `participant` by others since its last message; None if none."""
+        ...
+
     def open_round(self, author: str, opener: int, participants: Sequence[str], when: datetime) -> Round: ...
 
     def current_round(self) -> Round | None:

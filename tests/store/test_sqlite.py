@@ -32,6 +32,8 @@ def check_store(factory: Callable[[], Store]) -> None:
     assert [m.id for m in s.pending("claude")] == [1]
     assert [m.id for m in s.pending("codex")] == [2]
     assert [m.id for m in s.pending("codex", since=2)] == []
+    # Hops of what each participant received since its last message, read or not.
+    assert (s.chain_hops("user"), s.chain_hops("claude"), s.chain_hops("codex")) == (1, None, None)
     s.mark_read("codex", [2], _T0)
     assert s.pending("codex") == []
     assert [m.id for m in s.pending("user")] == [2]

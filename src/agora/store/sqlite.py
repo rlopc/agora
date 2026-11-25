@@ -186,6 +186,18 @@ class SqliteStore:
         )
         return [_message(r) for r in rows]
 
+    def chain_hops(self, participant: str) -> int | None:
+        rows = self._rows(
+            """
+            SELECT MAX(m.hops) AS hops FROM messages m
+            JOIN mentions c ON c.message_id = m.id AND c.participant = :participant
+            WHERE m.author != :participant
+              AND m.id > COALESCE((SELECT MAX(id) FROM messages WHERE author = :participant), 0)
+            """,
+            {"participant": participant},
+        )
+        return rows[0]["hops"]
+
     def open_round(self, author: str, opener: int, participants: Sequence[str], when: datetime) -> Round:
         with self._lock:
             cursor = self._db.execute(

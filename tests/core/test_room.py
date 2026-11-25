@@ -346,6 +346,42 @@ def test_moderator_resets_hops_and_the_brake_still_applies_between_agents(open_s
     assert m2.notified == ("alpha",)
 
 
+def test_parallel_answers_to_the_moderator_all_reach_it(open_store):
+    agents = ["alpha", "beta", "gamma"]
+    participants = [
+        Participant("user", "User", "human"),
+        Participant("moderator", "Moderator", "agent", "watch", role="moderator"),
+        *(Participant(a, a.title(), "agent", "watch") for a in agents),
+    ]
+    wakers = {p.id: FakeWaker() for p in participants if p.type == "agent"}
+    room = Room(participants, open_store(), wakers=wakers, clock=Clock())
+    start = room.send("user", "@moderator start")
+    ask = room.send("moderator", "@alpha @beta @gamma your view?", reply_to=start.message.id)
+    answers = [room.send(a, "@moderator mine", reply_to=ask.message.id) for a in agents]
+    # Each answer follows from the moderator's message, not from the previous answer.
+    assert [a.message.hops for a in answers] == [1, 1, 1]
+    assert room.state()["limit_reached"] is False
+    assert answers[0].notified == ("moderator",)  # the rest are batched until the moderator acts
+    assert [m.id for m in room.pending("moderator", activity=True)] == [a.message.id for a in answers]
+
+
+def test_a_chain_between_agents_is_still_cut_when_an_answer_also_mentions_the_moderator(open_store):
+    participants = [
+        Participant("user", "User", "human"),
+        Participant("moderator", "Moderator", "agent", "watch", role="moderator"),
+        Participant("alpha", "Alpha", "agent", "watch"),
+        Participant("beta", "Beta", "agent", "watch"),
+    ]
+    wakers = {p.id: FakeWaker() for p in participants if p.type == "agent"}
+    room = Room(participants, open_store(), wakers=wakers, clock=Clock())
+    ask = room.send("moderator", "@alpha @beta your view?")
+    e1 = room.send("alpha", "@moderator @beta I say A", reply_to=ask.message.id)
+    e2 = room.send("beta", "@alpha why A?")
+    e3 = room.send("alpha", "@beta because")
+    assert [e.message.hops for e in (e1, e2, e3)] == [1, 2, 3]
+    assert e3.notified == ()
+
+
 def test_moderator_turn_limit_waits_for_the_user(open_store):
     participants = [
         Participant("user", "User", "human"),
