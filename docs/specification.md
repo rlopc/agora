@@ -10,7 +10,7 @@ Agora runs on macOS and Linux and only listens on local addresses.
 
 ## Principles
 
-- **Minimal token use.** An agent is only woken when it is mentioned, wakes are batched and chains between agents have a hop limit.
+- **Minimal token use.** An agent is only woken when a message is addressed to it (it is mentioned, or the message replies to one of its own), wakes are batched and chains between agents have a hop limit.
 - **Local services only.** The core exposes three ports (`Store`, `Channel`, `Waker`); other channels (Slack…) would be new adapters, without changing the core or the agents.
 - **`AGENTS.md` is the single source of each role's instructions** and is never generated. What is specific to a tool goes in that tool's own file (for example, the marked section of `CLAUDE.md`).
 - **Generators never rewrite whole files** they do not own: they update only their keys, keep everything else, are idempotent and do not bypass the tool's protections (such as trusting hooks).
@@ -71,7 +71,7 @@ sequenceDiagram
 
 Each participant has an `id`, a name and a type, `human` or `agent`. Agents may have the role `moderator` (the only role). Mentions have the form `@id`, are lower-cased and deduplicated; unknown mentions are returned to the sender.
 
-A message from the user without mentions goes to the participants with the moderator role; if there is none, it wakes nobody. A message from an agent without mentions goes to nobody.
+A reply (`reply_to`) without mentions goes to the author of the original, unless that is the sender; it is stored as a mention, so it is pending for its recipient and subject to the same limits. During a blind round, an answer goes to whoever opened it instead (see [Blind rounds](#blind-rounds)). Otherwise, a message from the user without mentions goes to the participants with the moderator role, or wakes nobody if there is none, and a message from an agent without mentions goes to nobody. So when the user replies to an agent, the moderator does not get the reply unless the user mentions it.
 
 ### Hops, limit and pause
 
@@ -245,7 +245,7 @@ Above the thread, the UI lists the agents' pending permission requests, with «A
 The MCP server `agora` offers these tools, identifying the agent with `AGORA_PARTICIPANT`:
 
 - `pending()`: the unread messages that mention the agent; it also records activity.
-- `send(text, reply_to?, blind=false)`: posts a message; a reply marks the original as read; `blind` opens a blind round.
+- `send(text, reply_to?, blind=false)`: posts a message; a reply marks the original as read and, without mentions, goes to its author; `blind` opens a blind round.
 - `mark_read(ids)`: marks messages as handled without replying.
 - `history(since?, limit=20)`: the latest messages the agent may see, or those after `since`.
 - `close_round()`: closes the open blind round (user or moderator only).

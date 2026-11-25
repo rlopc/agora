@@ -207,6 +207,32 @@ def test_replying_marks_the_original_read(env):
     assert [x.id for x in room.pending("user")] == [2]
 
 
+def test_a_reply_without_mentions_reaches_the_author_of_the_original(env):
+    room, _, _, _ = env
+    question = room.send("claude", "@codex which port?").message
+    answer = room.send("codex", "8765", reply_to=question.id)
+    assert answer.message.mentions == ("claude",) and answer.notified == ("claude",)
+    assert [m.id for m in room.pending("claude")] == [answer.message.id]
+    # A reply to the user is pending for them, as a mention.
+    request = room.send("user", "@claude status?").message
+    status = room.send("claude", "all green", reply_to=request.id)
+    assert status.message.mentions == ("user",)
+    assert [m.id for m in room.pending("user")] == [status.message.id]
+
+
+def test_a_reply_with_mentions_or_to_oneself_adds_nobody(env):
+    room, _, _, _ = env
+    question = room.send("claude", "@codex which port?").message
+    assert room.send("codex", "@user he asks for the port", reply_to=question.id).message.mentions == ("user",)
+    assert room.send("claude", "never mind", reply_to=question.id).message.mentions == ()
+    # Over the hop limit, a reply is stored but wakes nobody, as any mention.
+    chain = [room.send("codex", "@claude one").message.id]
+    chain.append(room.send("claude", "two", reply_to=chain[-1]).message.id)
+    last = room.send("codex", "three", reply_to=chain[-1])
+    assert last.message.mentions == ("claude",) and last.message.hops >= room.max_hops
+    assert last.notified == ()
+
+
 def test_pause_does_not_wake_and_has_no_retroactive_effect(env):
     room, wakers, _, _ = env
     room.set_paused(True)
@@ -366,6 +392,22 @@ def test_user_message_without_mentions_goes_to_the_moderator(open_store):
     assert room.send("alpha", "no mentions").message.mentions == ()
 
 
+def test_a_user_reply_goes_to_the_agent_and_not_to_the_moderator(open_store):
+    participants = [
+        Participant("user", "User", "human"),
+        Participant("moderator", "Moderator", "agent", "watch", role="moderator"),
+        Participant("alpha", "Alpha", "agent", "codex_queue"),
+    ]
+    wakers = {p.id: FakeWaker() for p in participants if p.type == "agent"}
+    room = Room(participants, open_store(), wakers=wakers, clock=Clock())
+    question = room.send("alpha", "@user may I?").message
+    reply = room.send("user", "yes", reply_to=question.id)
+    assert reply.message.mentions == ("alpha",) and reply.notified == ("alpha",)
+    assert room.pending("moderator") == []
+    # A reply to their own message still goes to the moderator.
+    assert room.send("user", "and hurry", reply_to=reply.message.id).message.mentions == ("moderator",)
+
+
 def test_without_moderator_a_message_without_mentions_wakes_nobody(open_store):
     room = Room(PARTICIPANTS, open_store(), clock=Clock())
     assert room.send("user", "hello").notified == ()
@@ -446,6 +488,14 @@ def test_the_moderator_is_woken_once_with_all_the_answers(debate):
 
     room.send("critic", "B", reply_to=2)
     assert wakers["moderator"].calls == [("moderator", [1]), ("moderator", [3, 4])]
+
+
+def test_in_an_open_round_a_reply_goes_only_to_whoever_opened_it(debate):
+    room, _, _ = debate
+    task = room.send("moderator", "@proponent draft it").message
+    room.send("user", "@proponent @critic which database?", blind=True)
+    answer = room.send("proponent", "SQLite", reply_to=task.id)
+    assert answer.message.mentions == ("user",) and answer.held == ()
 
 
 def test_the_user_closes_a_round_that_someone_does_not_answer(debate):

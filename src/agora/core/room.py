@@ -93,18 +93,24 @@ class Room:
         text = text.strip()
         if not text:
             raise RoomError("the message is empty")
-        if reply_to is not None and self.store.get_message(reply_to) is None:
+        original = self.store.get_message(reply_to) if reply_to is not None else None
+        if reply_to is not None and original is None:
             raise RoomError(f"message #{reply_to} does not exist")
 
         mentions, unknown = extract_mentions(text, self.participants)
         mentions = tuple(m for m in mentions if m != author)
+        round = self.store.current_round()
+        # Round the message answers: any message by one of its participants while it is open.
+        answering = round if round is not None and author in round.participants else None
+        # A reply without mentions goes to the author of the original, stored as a mention; in a round the
+        # answer already goes to whoever opened it.
+        replied = original.author if original else None
+        if not mentions and not answering and replied in self.participants and replied != author:
+            mentions = (replied,)
         if not mentions and participant.type == "human":
             # A message from the user without mentions goes to the moderator, if any; otherwise, to nobody.
             mentions = tuple(p.id for p in self.participants.values() if p.role == "moderator")
-        round = self.store.current_round()
         round_participants = self._check_opening(participant, mentions, round) if blind else []
-        # Round the message answers: any message by one of its participants while it is open.
-        answering = round if round is not None and author in round.participants else None
         last = self.store.last_message()
         hops = 0 if participant.type == "human" or participant.role == "moderator" else (last.hops if last else 0) + 1
         # The moderator resets the hops, so its own messages since the user's last one are counted apart.
