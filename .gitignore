@@ -1,9 +1,17 @@
+# Python environment and bytecode
 .venv/
 __pycache__/
-.pytest_cache/
-.DS_Store
-data/
-*.local.*
-sample/
+
+# Test and coverage output
 .coverage
 .coverage.*
+.pytest_cache/
+
+# Local data and notes
+*.local.*
+data/
+inbox/
+sample/
+
+# Operating system
+.DS_Store
